@@ -1,0 +1,136 @@
+
+############################################################
+#  0. What are these two commands?
+############################################################
+
+kunal@kunal-devops:~$ which adduser useradd
+/usr/sbin/adduser
+/usr/sbin/useradd
+
+kunal@kunal-devops:~$ file $(which adduser)
+/usr/sbin/adduser: Perl script text executable
+
+kunal@kunal-devops:~$ file $(which useradd)
+/usr/sbin/useradd: ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, BuildID[sha1]=31fe1aa87190c2a7aa258cf32fe14b9564aa37db, for GNU/Linux 3.7.0, stripped
+
+adduser is a Perl SCRIPT (a friendly front-end); useradd is a compiled BINARY.
+
+############################################################
+#  1. The LOW-LEVEL way: useradd
+############################################################
+
+kunal@kunal-devops:~$ sudo useradd testuser_low
+
+kunal@kunal-devops:~$ grep testuser_low /etc/passwd
+testuser_low:x:1000:1001::/home/testuser_low:/bin/sh
+
+kunal@kunal-devops:~$ sudo ls -la /home | grep testuser_low || echo '(no home directory was created)'
+(no home directory was created)
+
+kunal@kunal-devops:~$ sudo passwd -S testuser_low
+testuser_low L 2026-09-03 0 99999 7 -1
+
+Bare useradd: no home directory, shell is /bin/sh, password LOCKED (the L above).
+
+############################################################
+#  2. The RECOMMENDED way on Ubuntu: adduser
+############################################################
+
+Typed by hand this is just:  sudo adduser testuser
+It then prompts for the password twice and the optional Full Name / Room / Phone fields.
+Run non-interactively here so the whole session could be captured:
+
+kunal@kunal-devops:~$ sudo adduser --disabled-password --gecos 'Test User,,,,' testuser
+
+kunal@kunal-devops:~$ echo 'testuser:StrongPassw0rd!' | sudo chpasswd && echo 'password set'
+password set
+
+kunal@kunal-devops:~$ grep testuser /etc/passwd
+testuser_low:x:1000:1001::/home/testuser_low:/bin/sh
+testuser:x:1002:1002:Test User,,,,:/home/testuser:/bin/bash
+
+kunal@kunal-devops:~$ sudo ls -la /home/testuser
+total 20
+drwxr-x--- 2 testuser testuser 4096 Sep  3 22:10 .
+drwxr-xr-x 4 root     root     4096 Sep  3 22:10 ..
+-rw-r--r-- 1 testuser testuser  220 Sep  3 22:10 .bash_logout
+-rw-r--r-- 1 testuser testuser 3771 Sep  3 22:10 .bashrc
+-rw-r--r-- 1 testuser testuser  807 Sep  3 22:10 .profile
+
+kunal@kunal-devops:~$ id testuser
+uid=1002(testuser) gid=1002(testuser) groups=1002(testuser),100(users)
+
+kunal@kunal-devops:~$ groups testuser
+testuser : testuser users
+
+kunal@kunal-devops:~$ sudo passwd -S testuser
+testuser P 2026-09-03 0 99999 7 -1
+
+
+############################################################
+#  3. The account actually works
+############################################################
+
+kunal@kunal-devops:~$ sudo su - testuser -c 'whoami; pwd; echo $SHELL'
+testuser
+/home/testuser
+/bin/bash
+
+kunal@kunal-devops:~$ sudo lslogins testuser | head -n 10
+Username:                           testuser                            
+UID:                                1002                                
+Gecos field:                        Test User,,,,                       
+Home directory:                     /home/testuser                      
+Shell:                              /bin/bash                           
+No login:                           no                                  
+Password is locked:                 no                                  
+Password not required (empty):      no                                  
+Login by password disabled:         no                                  
+Password encryption method:         yescrypt                            
+
+
+############################################################
+#  4. Side by side
+############################################################
+
+kunal@kunal-devops:~$ grep -E 'testuser(_low)?:' /etc/passwd
+testuser_low:x:1000:1001::/home/testuser_low:/bin/sh
+testuser:x:1002:1002:Test User,,,,:/home/testuser:/bin/bash
+
+kunal@kunal-devops:~$ sudo ls -d /home/testuser*
+/home/testuser
+
+
+############################################################
+#  5. Deleting users
+############################################################
+
+kunal@kunal-devops:~$ sudo deluser --remove-home testuser
+
+kunal@kunal-devops:~$ sudo userdel -r testuser_low 2>&1 | cat
+userdel: testuser_low mail spool (/var/mail/testuser_low) not found
+userdel: testuser_low home directory (/home/testuser_low) not found
+
+kunal@kunal-devops:~$ grep -E 'testuser' /etc/passwd || echo '(both test users removed)'
+(both test users removed)
+
+
+############################################################
+#  6. Re-create the test user with the recommended command and KEEP it
+############################################################
+
+kunal@kunal-devops:~$ sudo adduser --disabled-password --gecos 'Test User,,,,' testuser
+
+kunal@kunal-devops:~$ echo 'testuser:StrongPassw0rd!' | sudo chpasswd && echo 'password set'
+password set
+
+kunal@kunal-devops:~$ id testuser
+uid=1001(testuser) gid=1001(testuser) groups=1001(testuser),100(users)
+
+kunal@kunal-devops:~$ sudo passwd -S testuser
+testuser P 2026-09-03 0 99999 7 -1
+
+kunal@kunal-devops:~$ sudo su - testuser -c 'whoami; pwd'
+testuser
+/home/testuser
+

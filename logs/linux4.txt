@@ -1,0 +1,429 @@
+
+############################################################
+#  1. NAVIGATION
+############################################################
+
+kunal@kunal-devops:~/cheatlab$ pwd
+/home/kunal/cheatlab
+
+kunal@kunal-devops:~/cheatlab$ ls
+
+kunal@kunal-devops:~/cheatlab$ ls -l /etc | head -n 6
+total 952
+drwxr-xr-x 5 root root       4096 Jul 20 22:06 ModemManager
+drwxr-xr-x 3 root root       4096 Sep  3 22:09 NetworkManager
+drwxr-xr-x 2 root root       4096 Jul 20 22:07 PackageKit
+drwxr-xr-x 4 root root       4096 Jul 20 22:04 X11
+-rw-r--r-- 1 root root       4027 Nov  4  2025 adduser.conf
+
+kunal@kunal-devops:~/cheatlab$ ls -lah /etc | head -n 5
+total 968K
+drwxr-xr-x 114 root root      4.0K Sep  3 22:10 .
+drwxr-xr-x  19 root root      4.0K Sep  3 22:08 ..
+-rw-------   1 root root         0 Jul 20 22:03 .pwd.lock
+-rw-r--r--   1 root root       789 Jul 20 22:03 .resolv.conf.systemd-resolved.bak
+
+
+############################################################
+#  2. FILES AND DIRECTORIES
+############################################################
+
+kunal@kunal-devops:~/cheatlab$ mkdir -p project/src project/docs
+
+kunal@kunal-devops:~/cheatlab$ touch project/src/app.py project/docs/readme.txt
+
+kunal@kunal-devops:~/cheatlab$ tree project
+project
+├── docs
+│   └── readme.txt
+└── src
+    └── app.py
+
+3 directories, 2 files
+
+kunal@kunal-devops:~/cheatlab$ cp project/docs/readme.txt project/docs/readme.bak
+
+kunal@kunal-devops:~/cheatlab$ mv project/docs/readme.bak project/docs/notes.txt
+
+kunal@kunal-devops:~/cheatlab$ ls -l project/docs
+total 0
+-rw-rw-r-- 1 kunal kunal 0 Sep  3 22:10 notes.txt
+-rw-rw-r-- 1 kunal kunal 0 Sep  3 22:10 readme.txt
+
+kunal@kunal-devops:~/cheatlab$ rm project/docs/notes.txt
+
+kunal@kunal-devops:~/cheatlab$ rmdir project/docs
+rmdir: failed to remove 'project/docs': Directory not empty
+(exit code: 1 - rmdir only removes EMPTY directories)
+
+kunal@kunal-devops:~/cheatlab$ rm -r project/docs && ls project
+src
+
+
+############################################################
+#  3. VIEWING FILE CONTENT
+############################################################
+
+kunal@kunal-devops:~/cheatlab$ printf 'alpha\nbravo\ncharlie\ndelta\necho\n' > words.txt
+
+kunal@kunal-devops:~/cheatlab$ cat words.txt
+alpha
+bravo
+charlie
+delta
+echo
+
+kunal@kunal-devops:~/cheatlab$ head -n 2 words.txt
+alpha
+bravo
+
+kunal@kunal-devops:~/cheatlab$ tail -n 2 words.txt
+delta
+echo
+
+kunal@kunal-devops:~/cheatlab$ wc -l words.txt
+5 words.txt
+
+kunal@kunal-devops:~/cheatlab$ wc -w words.txt
+5 words.txt
+
+
+############################################################
+#  4. SEARCHING
+############################################################
+
+kunal@kunal-devops:~/cheatlab$ grep 'char' words.txt
+charlie
+
+kunal@kunal-devops:~/cheatlab$ grep -n -i 'DELTA' words.txt
+4:delta
+
+kunal@kunal-devops:~/cheatlab$ grep -c 'a' words.txt
+4
+
+kunal@kunal-devops:~/cheatlab$ grep -v 'a' words.txt
+echo
+
+kunal@kunal-devops:~/cheatlab$ find ~/cheatlab -name '*.txt'
+/home/kunal/cheatlab/words.txt
+
+kunal@kunal-devops:~/cheatlab$ find /etc -maxdepth 1 -name 'host*'
+/etc/hosts
+/etc/hostname
+/etc/host.conf
+/etc/hosts.deny
+/etc/hosts.allow
+
+kunal@kunal-devops:~/cheatlab$ find ~/cheatlab -type f -mmin -5
+/home/kunal/cheatlab/words.txt
+/home/kunal/cheatlab/project/src/app.py
+
+
+############################################################
+#  5. REDIRECTION AND PIPES
+############################################################
+
+kunal@kunal-devops:~/cheatlab$ ls -l /etc | head -n 3
+total 952
+drwxr-xr-x 5 root root       4096 Jul 20 22:06 ModemManager
+drwxr-xr-x 3 root root       4096 Sep  3 22:09 NetworkManager
+
+kunal@kunal-devops:~/cheatlab$ cat words.txt | sort -r
+echo
+delta
+charlie
+bravo
+alpha
+
+kunal@kunal-devops:~/cheatlab$ echo 'appended line' >> words.txt && tail -n 2 words.txt
+echo
+appended line
+
+kunal@kunal-devops:~/cheatlab$ cat words.txt | wc -l
+6
+
+kunal@kunal-devops:~/cheatlab$ ls /nope 2> error.log; cat error.log
+ls: cannot access '/nope': No such file or directory
+
+kunal@kunal-devops:~/cheatlab$ echo 'saved and shown' | tee out.txt
+saved and shown
+
+
+############################################################
+#  6. PERMISSIONS AND OWNERSHIP
+############################################################
+
+kunal@kunal-devops:~/cheatlab$ touch script.sh && ls -l script.sh
+-rw-rw-r-- 1 kunal kunal 0 Sep  3 22:10 script.sh
+
+kunal@kunal-devops:~/cheatlab$ chmod +x script.sh && ls -l script.sh
+-rwxrwxr-x 1 kunal kunal 0 Sep  3 22:10 script.sh
+
+kunal@kunal-devops:~/cheatlab$ chmod 640 words.txt && ls -l words.txt
+-rw-r----- 1 kunal kunal 45 Sep  3 22:10 words.txt
+
+kunal@kunal-devops:~/cheatlab$ chmod 755 script.sh && ls -l script.sh
+-rwxr-xr-x 1 kunal kunal 0 Sep  3 22:10 script.sh
+
+kunal@kunal-devops:~/cheatlab$ sudo chown root:root out.txt && ls -l out.txt
+-rw-rw-r-- 1 root root 16 Sep  3 22:10 out.txt
+
+kunal@kunal-devops:~/cheatlab$ sudo chown kunal:kunal out.txt && ls -l out.txt
+-rw-rw-r-- 1 kunal kunal 16 Sep  3 22:10 out.txt
+
+kunal@kunal-devops:~/cheatlab$ umask
+0002
+
+kunal@kunal-devops:~/cheatlab$ id
+uid=501(kunal) gid=1000(kunal) groups=1000(kunal),109(docker),999(systemd-journal)
+
+kunal@kunal-devops:~/cheatlab$ whoami
+kunal
+
+kunal@kunal-devops:~/cheatlab$ groups
+kunal docker systemd-journal
+
+
+############################################################
+#  7. PROCESSES AND JOBS
+############################################################
+
+kunal@kunal-devops:~/cheatlab$ ps aux | head -n 5
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root           1  0.9  0.2  27984 18480 ?        Ss   22:06   0:01 /usr/lib/systemd/systemd --switched-root --system --deserialize=44
+root           2  0.0  0.0      0     0 ?        S    22:06   0:00 [kthreadd]
+root           3  0.0  0.0      0     0 ?        S    22:06   0:00 [pool_workqueue_release]
+root           4  0.0  0.0      0     0 ?        I<   22:06   0:00 [kworker/R-rcu_gp]
+
+kunal@kunal-devops:~/cheatlab$ ps -ef | head -n 5
+UID          PID    PPID  C STIME TTY          TIME CMD
+root           1       0  0 22:06 ?        00:00:01 /usr/lib/systemd/systemd --switched-root --system --deserialize=44
+root           2       0  0 22:06 ?        00:00:00 [kthreadd]
+root           3       2  0 22:06 ?        00:00:00 [pool_workqueue_release]
+root           4       2  0 22:06 ?        00:00:00 [kworker/R-rcu_gp]
+
+kunal@kunal-devops:~/cheatlab$ top -b -n 1 | head -n 8
+top - 22:10:06 up 3 min,  2 users,  load average: 0.13, 0.09, 0.03
+Tasks: 166 total,   1 running, 163 sleeping,   0 stopped,   2 zombie
+%Cpu(s):  0.0 us,  0.0 sy,  0.0 ni,100.0 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st 
+MiB Mem :   7913.3 total,   5324.6 free,    635.8 used,   2142.2 buff/cache     
+MiB Swap:      0.0 total,      0.0 free,      0.0 used.   7277.5 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+      1 root      20   0   27984  18480  10620 S   0.0   0.2   0:01.85 systemd
+
+kunal@kunal-devops:~/cheatlab$ sleep 120 & echo "background job started with PID $!"
+background job started with PID 19746
+
+kunal@kunal-devops:~/cheatlab$ jobs
+[1]+  Running                    sleep 120 &
+
+kunal@kunal-devops:~/cheatlab$ pgrep -a sleep
+19746 sleep 120
+
+kunal@kunal-devops:~/cheatlab$ nice -n 10 echo 'ran with a lower priority'
+ran with a lower priority
+
+kunal@kunal-devops:~/cheatlab$ kill %1 2>/dev/null; sleep 1; pgrep -a sleep || echo '(the sleep process was killed)'
+(the sleep process was killed)
+
+kunal@kunal-devops:~/cheatlab$ nohup sleep 5 >/dev/null 2>&1 & echo 'nohup keeps a job running after logout'
+nohup keeps a job running after logout
+
+
+############################################################
+#  8. DISK AND MEMORY
+############################################################
+
+kunal@kunal-devops:~/cheatlab$ df -h
+Filesystem      Size  Used Avail Use% Mounted on
+tmpfs           1.6G  1.1M  1.6G   1% /run
+/dev/vda1        96G  3.4G   93G   4% /
+tmpfs           3.9G     0  3.9G   0% /dev/shm
+efivarfs         56K  1.4K   55K   3% /sys/firmware/efi/efivars
+tmpfs           3.9G     0  3.9G   0% /tmp
+none            1.0M     0  1.0M   0% /run/credentials/systemd-journald.service
+/dev/vda13      891M  126M  704M  16% /boot
+/dev/vda15       98M  6.5M   91M   7% /boot/efi
+none            1.0M     0  1.0M   0% /run/credentials/systemd-networkd.service
+/dev/vdb        269M  269M     0 100% /mnt/lima-cidata
+none            1.0M     0  1.0M   0% /run/credentials/systemd-resolved.service
+tmpfs           792M   40K  792M   1% /run/user/501
+none            1.0M     0  1.0M   0% /run/credentials/sshd@4-3-3:22-2:2208094944.service
+none            1.0M     0  1.0M   0% /run/credentials/getty@tty1.service
+none            1.0M     0  1.0M   0% /run/credentials/serial-getty@hvc0.service
+none            1.0M     0  1.0M   0% /run/credentials/sshd@16-8214-3:22-2:1372774931.service
+
+kunal@kunal-devops:~/cheatlab$ du -sh ~/cheatlab
+24K	/home/kunal/cheatlab
+
+kunal@kunal-devops:~/cheatlab$ du -sh * | sort -h
+0	script.sh
+4.0K	error.log
+4.0K	out.txt
+4.0K	words.txt
+8.0K	project
+
+kunal@kunal-devops:~/cheatlab$ free -h
+               total        used        free      shared  buff/cache   available
+Mem:           7.7Gi       634Mi       5.2Gi       1.1Mi       2.1Gi       7.1Gi
+Swap:             0B          0B          0B
+
+kunal@kunal-devops:~/cheatlab$ uptime
+ 22:10:07 up 3 min,  2 users,  load average: 0.12, 0.09, 0.03
+
+kunal@kunal-devops:~/cheatlab$ lsblk
+NAME    MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+vda     253:0    0   100G  0 disk 
+├─vda1  253:1    0    99G  0 part /
+├─vda13 253:13   0   923M  0 part /boot
+└─vda15 253:15   0    99M  0 part /boot/efi
+vdb     253:16   0 268.2M  1 disk /mnt/lima-cidata
+
+kunal@kunal-devops:~/cheatlab$ vmstat 1 2
+procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
+ 0  0      0 5453200  37204 2156972    0    0  4447  8287 1980    6  3  2 95  0  0  0
+ 0  0      0 5456716  37204 2157204    0    0     0    28  251  242  0  0 100  0  0  0
+
+
+############################################################
+#  9. SYSTEM INFORMATION
+############################################################
+
+kunal@kunal-devops:~/cheatlab$ uname -a
+Linux kunal-devops 7.0.0-28-generic #28-Ubuntu SMP PREEMPT_DYNAMIC Sun Jun 21 00:50:10 UTC 2026 aarch64 GNU/Linux
+
+kunal@kunal-devops:~/cheatlab$ hostname
+kunal-devops
+
+kunal@kunal-devops:~/cheatlab$ date
+Thu Sep  3 22:10:08 IST 2026
+
+kunal@kunal-devops:~/cheatlab$ cat /etc/os-release | head -n 4
+PRETTY_NAME="Ubuntu 26.04 LTS"
+NAME="Ubuntu"
+VERSION_ID="26.04"
+VERSION="26.04 LTS (Resolute Raccoon)"
+
+kunal@kunal-devops:~/cheatlab$ who
+
+kunal@kunal-devops:~/cheatlab$ systemctl status cron --no-pager | head -n 5
+● cron.service - Regular background program processing daemon
+     Loaded: loaded (/usr/lib/systemd/system/cron.service; enabled; preset: enabled)
+     Active: active (running) since Thu 2026-09-03 22:10:05 IST; 2s ago
+ Invocation: a8e52effbe124e3db9e89b9471a47f5b
+       Docs: man:cron(8)
+
+
+############################################################
+#  10. NETWORKING (quick look)
+############################################################
+
+kunal@kunal-devops:~/cheatlab$ hostname -I
+192.168.5.15 172.17.0.1 
+
+kunal@kunal-devops:~/cheatlab$ ip -brief addr
+lo               UNKNOWN        127.0.0.1/8 ::1/128 
+eth0             UP             192.168.5.15/24 metric 200 fe80::5055:55ff:fed5:eb01/64 
+docker0          DOWN           172.17.0.1/16 
+
+kunal@kunal-devops:~/cheatlab$ ping -c 2 127.0.0.1
+PING 127.0.0.1 (127.0.0.1) 56(84) bytes of data.
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 time=0.082 ms
+64 bytes from 127.0.0.1: icmp_seq=2 ttl=64 time=0.241 ms
+
+--- 127.0.0.1 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1044ms
+rtt min/avg/max/mdev = 0.082/0.161/0.241/0.079 ms
+
+kunal@kunal-devops:~/cheatlab$ sudo ss -tlnp | grep :22
+LISTEN 0      4096         0.0.0.0:22         0.0.0.0:*    users:(("sshd",pid=1771,fd=3),("systemd",pid=1,fd=231))
+LISTEN 0      4096            [::]:22            [::]:*    users:(("sshd",pid=1771,fd=4),("systemd",pid=1,fd=232))
+
+
+############################################################
+#  11. PACKAGE MANAGEMENT
+############################################################
+
+kunal@kunal-devops:~/cheatlab$ apt list --installed 2>/dev/null | wc -l
+701
+
+kunal@kunal-devops:~/cheatlab$ dpkg -l | grep -c '^ii'
+700
+
+kunal@kunal-devops:~/cheatlab$ apt-cache policy git | head -n 3
+git:
+  Installed: 1:2.53.0-1ubuntu1
+  Candidate: 1:2.53.0-1ubuntu1
+
+
+############################################################
+#  12. ARCHIVES AND SYNC
+############################################################
+
+kunal@kunal-devops:~/cheatlab$ tar -czf project.tar.gz project
+
+kunal@kunal-devops:~/cheatlab$ ls -lh project.tar.gz
+-rw-rw-r-- 1 kunal kunal 166 Sep  3 22:10 project.tar.gz
+
+kunal@kunal-devops:~/cheatlab$ tar -tzf project.tar.gz
+project/
+project/src/
+project/src/app.py
+
+kunal@kunal-devops:~/cheatlab$ mkdir -p restored && tar -xzf project.tar.gz -C restored && find restored
+restored
+restored/project
+restored/project/src
+restored/project/src/app.py
+
+kunal@kunal-devops:~/cheatlab$ rsync -av project/ rsynced/ | tail -n 5
+src/
+src/app.py
+
+sent 155 bytes  received 76 bytes  462.00 bytes/sec
+total size is 0  speedup is 0.00
+
+
+############################################################
+#  13. SCHEDULING
+############################################################
+
+kunal@kunal-devops:~/cheatlab$ crontab -l 2>&1 | tail -n 2
+no crontab for kunal
+
+kunal@kunal-devops:~/cheatlab$ echo '0 2 * * * /home/kunal/backup.sh' | crontab - && crontab -l
+0 2 * * * /home/kunal/backup.sh
+
+kunal@kunal-devops:~/cheatlab$ crontab -r && crontab -l 2>&1 | tail -n 1
+no crontab for kunal
+
+
+############################################################
+#  14. GETTING HELP
+############################################################
+
+kunal@kunal-devops:~/cheatlab$ man ls | head -n 5
+LS(1)                       General Commands Manual                       LS(1)
+
+NAME
+       ls  -  List  directory  contents.  Ignore files and directories starting
+       with a '.' by default
+
+kunal@kunal-devops:~/cheatlab$ ls --help | head -n 5
+List directory contents.
+Ignore files and directories starting with a '.' by default
+
+Usage: ls [OPTION]... [FILE]...
+
+
+kunal@kunal-devops:~/cheatlab$ which ls
+/usr/bin/ls
+
+kunal@kunal-devops:~/cheatlab$ type cd
+cd is a shell builtin
+
+kunal@kunal-devops:~/cheatlab$ whatis grep
+grep (1)             - print lines that match patterns
+

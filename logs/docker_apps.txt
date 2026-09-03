@@ -1,0 +1,582 @@
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world$ ls
+Apache-app
+README.md
+React-app
+java-app
+nginx-app
+nodejs-app
+python-app
+screenshots
+
+
+############################################################
+#  nodejs-app
+############################################################
+
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world/nodejs-app$ cat Dockerfile
+# Small official Node base image
+FROM node:20-alpine
+
+# Everything happens inside /app in the container
+WORKDIR /app
+
+# Copy the manifest first so Docker can cache the npm install layer
+COPY package.json ./
+RUN npm install --omit=dev
+
+# Now copy the application source
+COPY server.js ./
+
+# Document the port the app listens on
+EXPOSE 3000
+
+CMD ["node", "server.js"]
+
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world/nodejs-app$ docker build -t hello-nodejs .
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
+
+Sending build context to Docker daemon  8.704kB
+Step 1/7 : FROM node:20-alpine
+20-alpine: Pulling from library/node
+cd322d0ddd02: Pulling fs layer
+13e45b12880f: Pulling fs layer
+bda5d7ef971f: Pulling fs layer
+d17f077ada11: Pulling fs layer
+cd322d0ddd02: Download complete
+d17f077ada11: Download complete
+d17f077ada11: Pull complete
+13e45b12880f: Download complete
+e68c4317c820: Download complete
+85e939e07fce: Download complete
+bda5d7ef971f: Download complete
+cd322d0ddd02: Pull complete
+13e45b12880f: Pull complete
+bda5d7ef971f: Pull complete
+Digest: sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
+Status: Downloaded newer image for node:20-alpine
+ ---> fb4cd12c85ee
+Step 2/7 : WORKDIR /app
+ ---> Running in b0717919a9c7
+ ---> Removed intermediate container b0717919a9c7
+ ---> a80e00f10731
+Step 3/7 : COPY package.json ./
+ ---> f7502ae61f43
+Step 4/7 : RUN npm install --omit=dev
+ ---> Running in 56bc856aae14
+
+added 68 packages, and audited 69 packages in 2s
+
+15 packages are looking for funding
+  run `npm fund` for details
+
+3 moderate severity vulnerabilities
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+[91mnpm notice
+npm notice New major version of npm available! 10.8.2 -> 12.0.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+npm notice To update run: npm install -g npm@12.0.2
+npm notice
+[0m ---> Removed intermediate container 56bc856aae14
+ ---> 288cc768cdc0
+Step 5/7 : COPY server.js ./
+ ---> 304fa2dddc85
+Step 6/7 : EXPOSE 3000
+ ---> Running in ede2136e0568
+ ---> Removed intermediate container ede2136e0568
+ ---> 4d7de9177d3d
+Step 7/7 : CMD ["node", "server.js"]
+ ---> Running in 313019fc77a0
+ ---> Removed intermediate container 313019fc77a0
+ ---> 149be07f3208
+Successfully built 149be07f3208
+Successfully tagged hello-nodejs:latest
+
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world/nodejs-app$ docker run -d --name node-hello -p 3100:3000 hello-nodejs
+2400edfec3bc56698d5aa64b2975d336c70abc5151665d5f978d534d0c201a69
+
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world/nodejs-app$ docker ps --filter name=node-hello --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
+NAMES        IMAGE          STATUS         PORTS
+node-hello   hello-nodejs   Up 4 seconds   0.0.0.0:3100->3000/tcp, [::]:3100->3000/tcp
+
+
+############################################################
+#  python-app
+############################################################
+
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world/python-app$ cat Dockerfile
+# Slim official Python base image
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install dependencies first for better layer caching
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app.py ./
+
+EXPOSE 5000
+
+CMD ["python", "app.py"]
+
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world/python-app$ docker build -t hello-python .
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
+
+Sending build context to Docker daemon  7.168kB
+Step 1/7 : FROM python:3.12-slim
+3.12-slim: Pulling from library/python
+3550292b2150: Pulling fs layer
+ab2cb3ee67af: Pulling fs layer
+8aff2d3a9af8: Pulling fs layer
+bf7af0229701: Pulling fs layer
+3550292b2150: Download complete
+f392c22314d9: Download complete
+d8d4cdf3552b: Download complete
+ab2cb3ee67af: Download complete
+bf7af0229701: Download complete
+ab2cb3ee67af: Pull complete
+bf7af0229701: Pull complete
+8aff2d3a9af8: Download complete
+8aff2d3a9af8: Pull complete
+3550292b2150: Pull complete
+Digest: sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea
+Status: Downloaded newer image for python:3.12-slim
+ ---> 78387bc3881b
+Step 2/7 : WORKDIR /app
+ ---> Running in 79c29a213e7e
+ ---> Removed intermediate container 79c29a213e7e
+ ---> 1975e0ff18b0
+Step 3/7 : COPY requirements.txt ./
+ ---> 9ba7b1a33d85
+Step 4/7 : RUN pip install --no-cache-dir -r requirements.txt
+ ---> Running in dc994a2987f2
+Collecting flask==3.0.3 (from -r requirements.txt (line 1))
+  Downloading flask-3.0.3-py3-none-any.whl.metadata (3.2 kB)
+Collecting Werkzeug>=3.0.0 (from flask==3.0.3->-r requirements.txt (line 1))
+  Downloading werkzeug-3.1.8-py3-none-any.whl.metadata (4.0 kB)
+Collecting Jinja2>=3.1.2 (from flask==3.0.3->-r requirements.txt (line 1))
+  Downloading jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+Collecting itsdangerous>=2.1.2 (from flask==3.0.3->-r requirements.txt (line 1))
+  Downloading itsdangerous-2.2.0-py3-none-any.whl.metadata (1.9 kB)
+Collecting click>=8.1.3 (from flask==3.0.3->-r requirements.txt (line 1))
+  Downloading click-8.5.0-py3-none-any.whl.metadata (2.6 kB)
+Collecting blinker>=1.6.2 (from flask==3.0.3->-r requirements.txt (line 1))
+  Downloading blinker-1.9.0-py3-none-any.whl.metadata (1.6 kB)
+Collecting MarkupSafe>=2.0 (from Jinja2>=3.1.2->flask==3.0.3->-r requirements.txt (line 1))
+  Downloading markupsafe-3.0.3-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (2.7 kB)
+Downloading flask-3.0.3-py3-none-any.whl (101 kB)
+Downloading blinker-1.9.0-py3-none-any.whl (8.5 kB)
+Downloading click-8.5.0-py3-none-any.whl (125 kB)
+Downloading itsdangerous-2.2.0-py3-none-any.whl (16 kB)
+Downloading jinja2-3.1.6-py3-none-any.whl (134 kB)
+Downloading werkzeug-3.1.8-py3-none-any.whl (226 kB)
+Downloading markupsafe-3.0.3-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (24 kB)
+Installing collected packages: MarkupSafe, itsdangerous, click, blinker, Werkzeug, Jinja2, flask
+Successfully installed Jinja2-3.1.6 MarkupSafe-3.0.3 Werkzeug-3.1.8 blinker-1.9.0 click-8.5.0 flask-3.0.3 itsdangerous-2.2.0
+[91mWARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+[0m[91m
+[notice] A new release of pip is available: 25.0.1 -> 26.2.1
+[notice] To update, run: pip install --upgrade pip
+[0m ---> Removed intermediate container dc994a2987f2
+ ---> 89a85c5b435b
+Step 5/7 : COPY app.py ./
+ ---> dc100eb17779
+Step 6/7 : EXPOSE 5000
+ ---> Running in 5a0f326ec8df
+ ---> Removed intermediate container 5a0f326ec8df
+ ---> a24baf08c74f
+Step 7/7 : CMD ["python", "app.py"]
+ ---> Running in 5881faa0f6b1
+ ---> Removed intermediate container 5881faa0f6b1
+ ---> 3a364c35e12f
+Successfully built 3a364c35e12f
+Successfully tagged hello-python:latest
+
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world/python-app$ docker run -d --name python-hello -p 5100:5000 hello-python
+3120276c241530fe86fc721a575c90f884864c0f882f928009cb44cc9f8f19be
+
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world/python-app$ docker ps --filter name=python-hello --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
+NAMES          IMAGE          STATUS         PORTS
+python-hello   hello-python   Up 4 seconds   0.0.0.0:5100->5000/tcp, [::]:5100->5000/tcp
+
+
+############################################################
+#  java-app
+############################################################
+
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world/java-app$ cat Dockerfile
+# ---- build stage: compile the class with a full JDK ----
+FROM eclipse-temurin:21-jdk AS build
+WORKDIR /src
+COPY HelloWorld.java ./
+RUN javac -d /out HelloWorld.java
+
+# ---- run stage: ship only the compiled class on a JRE ----
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+COPY --from=build /out ./
+
+EXPOSE 8080
+
+CMD ["java", "HelloWorld"]
+
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world/java-app$ docker build -t hello-java .
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
+
+Sending build context to Docker daemon  7.168kB
+Step 1/9 : FROM eclipse-temurin:21-jdk AS build
+21-jdk: Pulling from library/eclipse-temurin
+c3f3f88309df: Pulling fs layer
+0ae32d51e549: Pulling fs layer
+ed8299a102e9: Pulling fs layer
+baffb41879ca: Pulling fs layer
+ff9661c3ca29: Pulling fs layer
+50914c2b24a1: Pulling fs layer
+ff9661c3ca29: Download complete
+0ae32d51e549: Download complete
+50914c2b24a1: Download complete
+c6cd40608b2e: Download complete
+c3f3f88309df: Download complete
+993450fd8f14: Download complete
+ed8299a102e9: Download complete
+50914c2b24a1: Pull complete
+ed8299a102e9: Pull complete
+c3f3f88309df: Pull complete
+baffb41879ca: Download complete
+ff9661c3ca29: Pull complete
+0ae32d51e549: Pull complete
+baffb41879ca: Pull complete
+Digest: sha256:85f00967bcc624fc19fa9c2cf124ea426a5363898e267141726f31f358c2e14b
+Status: Downloaded newer image for eclipse-temurin:21-jdk
+ ---> 85f00967bcc6
+Step 2/9 : WORKDIR /src
+ ---> Running in 52c604cd394a
+ ---> Removed intermediate container 52c604cd394a
+ ---> 6e880288ca14
+Step 3/9 : COPY HelloWorld.java ./
+ ---> ea42171d1378
+Step 4/9 : RUN javac -d /out HelloWorld.java
+ ---> Running in ecb6665b731e
+ ---> Removed intermediate container ecb6665b731e
+ ---> 1b3b78fbd9c2
+Step 5/9 : FROM eclipse-temurin:21-jre
+21-jre: Pulling from library/eclipse-temurin
+ef4fb6794bcf: Pulling fs layer
+2d4fe310559d: Pulling fs layer
+f412f7e21d80: Pulling fs layer
+b6bdfedf7f6d: Pulling fs layer
+ef4fb6794bcf: Download complete
+f412f7e21d80: Download complete
+19322d9fcdaf: Download complete
+b6bdfedf7f6d: Download complete
+b6bdfedf7f6d: Pull complete
+af63669e338c: Download complete
+2d4fe310559d: Download complete
+2d4fe310559d: Pull complete
+ef4fb6794bcf: Pull complete
+f412f7e21d80: Pull complete
+Digest: sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037
+Status: Downloaded newer image for eclipse-temurin:21-jre
+ ---> 7a65df4b22d2
+Step 6/9 : WORKDIR /app
+ ---> Running in 2e033515286a
+ ---> Removed intermediate container 2e033515286a
+ ---> 85d881d099d2
+Step 7/9 : COPY --from=build /out ./
+ ---> fc71a2439c00
+Step 8/9 : EXPOSE 8080
+ ---> Running in 5cdc965d09ee
+ ---> Removed intermediate container 5cdc965d09ee
+ ---> 71c58c4a548f
+Step 9/9 : CMD ["java", "HelloWorld"]
+ ---> Running in 00a0765e51d0
+ ---> Removed intermediate container 00a0765e51d0
+ ---> fed993be3872
+Successfully built fed993be3872
+Successfully tagged hello-java:latest
+
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world/java-app$ docker run -d --name java-hello -p 8180:8080 hello-java
+060fa82a28ce3b3567beb9fb8b9a4526479fb7f7c7db8aa9af607886c09c467a
+
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world/java-app$ docker ps --filter name=java-hello --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
+NAMES        IMAGE        STATUS         PORTS
+java-hello   hello-java   Up 4 seconds   0.0.0.0:8180->8080/tcp, [::]:8180->8080/tcp
+
+
+############################################################
+#  Apache-app
+############################################################
+
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world/Apache-app$ cat Dockerfile
+# Official Apache HTTP Server image
+FROM httpd:2.4
+
+# httpd serves everything under this directory
+COPY index.html /usr/local/apache2/htdocs/index.html
+
+EXPOSE 80
+# The base image already starts httpd in the foreground, so no CMD is needed.
+
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world/Apache-app$ docker build -t hello-apache .
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
+
+Sending build context to Docker daemon  5.632kB
+Step 1/3 : FROM httpd:2.4
+2.4: Pulling from library/httpd
+fff91e36faf1: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+01289bdb7344: Pulling fs layer
+cea950926c89: Pulling fs layer
+91eac6ee2743: Pulling fs layer
+fff91e36faf1: Download complete
+01289bdb7344: Download complete
+4f4fb700ef54: Download complete
+cea950926c89: Download complete
+01289bdb7344: Pull complete
+4f4fb700ef54: Pull complete
+cea950926c89: Pull complete
+d461d957ad8a: Download complete
+91eac6ee2743: Download complete
+fff91e36faf1: Pull complete
+91eac6ee2743: Pull complete
+e78b009430d6: Download complete
+Digest: sha256:979c38c2228d28c2edfd45c6e27dcee1c7b4a101a5526721ae8ece454e89e99e
+Status: Downloaded newer image for httpd:2.4
+ ---> 979c38c2228d
+Step 2/3 : COPY index.html /usr/local/apache2/htdocs/index.html
+ ---> a881023f7982
+Step 3/3 : EXPOSE 80
+ ---> Running in e68af0580021
+ ---> Removed intermediate container e68af0580021
+ ---> e738b0fd797c
+Successfully built e738b0fd797c
+Successfully tagged hello-apache:latest
+
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world/Apache-app$ docker run -d --name apache-hello -p 8181:80 hello-apache
+d9e798810f71cf08e3be5b4a870760fef0c8575a09060685191820028a317e6d
+
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world/Apache-app$ docker ps --filter name=apache-hello --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
+NAMES          IMAGE          STATUS         PORTS
+apache-hello   hello-apache   Up 4 seconds   0.0.0.0:8181->80/tcp, [::]:8181->80/tcp
+
+
+############################################################
+#  React-app
+############################################################
+
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world/React-app$ cat Dockerfile
+# ---- build stage: install dependencies and produce the static bundle ----
+FROM node:20-alpine AS build
+WORKDIR /app
+
+# Manifest first, so the dependency layer is cached between builds
+COPY package.json ./
+RUN npm install
+
+# Then the source, and build the production bundle into /app/dist
+COPY . .
+RUN npm run build
+
+# ---- run stage: serve the static bundle with Nginx ----
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world/React-app$ docker build -t hello-react .
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
+
+Sending build context to Docker daemon  13.31kB
+Step 1/9 : FROM node:20-alpine AS build
+ ---> fb4cd12c85ee
+Step 2/9 : WORKDIR /app
+ ---> Using cache
+ ---> a80e00f10731
+Step 3/9 : COPY package.json ./
+ ---> f00cc2b27780
+Step 4/9 : RUN npm install
+ ---> Running in 628b8561ce61
+
+added 62 packages, and audited 63 packages in 8s
+
+7 packages are looking for funding
+  run `npm fund` for details
+[91mnpm notice
+npm notice New major version of npm available! 10.8.2 -> 12.0.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+npm notice To update run: npm install -g npm@12.0.2
+npm notice
+[0m
+2 vulnerabilities (1 moderate, 1 high)
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+ ---> Removed intermediate container 628b8561ce61
+ ---> 045eedc72cda
+Step 5/9 : COPY . .
+ ---> 8ac23ba1574e
+Step 6/9 : RUN npm run build
+ ---> Running in 442580b78f6d
+
+> react-hello-world@1.0.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 31 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.40 kB │ gzip:  0.27 kB
+dist/assets/index-CBZ5nGWe.css    0.10 kB │ gzip:  0.11 kB
+dist/assets/index-Dfqor15E.js   142.78 kB │ gzip: 45.86 kB
+✓ built in 356ms
+ ---> Removed intermediate container 442580b78f6d
+ ---> 4ac0dab04447
+Step 7/9 : FROM nginx:alpine
+alpine: Pulling from library/nginx
+5de55e5ef9c0: Pulling fs layer
+badda8760139: Pulling fs layer
+accee44535cd: Pulling fs layer
+9592924c961c: Pulling fs layer
+1791812138bb: Pulling fs layer
+2123acec2175: Pulling fs layer
+d6c1262595ab: Pulling fs layer
+853498d24c3c: Pulling fs layer
+9592924c961c: Download complete
+853498d24c3c: Download complete
+d6c1262595ab: Download complete
+5de55e5ef9c0: Download complete
+2123acec2175: Download complete
+1791812138bb: Download complete
+5de55e5ef9c0: Pull complete
+a855f9d558c0: Download complete
+accee44535cd: Download complete
+9592924c961c: Pull complete
+853498d24c3c: Pull complete
+d6c1262595ab: Pull complete
+2123acec2175: Pull complete
+1791812138bb: Pull complete
+accee44535cd: Pull complete
+c4f99b055a72: Download complete
+badda8760139: Download complete
+badda8760139: Pull complete
+Digest: sha256:a9ae6f6d078d477e21323310498e5196cb2b7c0aedd9e07b7306612077227d7c
+Status: Downloaded newer image for nginx:alpine
+ ---> a9ae6f6d078d
+Step 8/9 : COPY --from=build /app/dist /usr/share/nginx/html
+ ---> 46b7a66460b8
+Step 9/9 : EXPOSE 80
+ ---> Running in 60837b58543d
+ ---> Removed intermediate container 60837b58543d
+ ---> 42494398b2bb
+Successfully built 42494398b2bb
+Successfully tagged hello-react:latest
+
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world/React-app$ docker run -d --name react-hello -p 3101:80 hello-react
+78b99130ed0f1709492eab7a5d80db5f666fe68ff7a3243863248eabc35489b2
+
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world/React-app$ docker ps --filter name=react-hello --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
+NAMES         IMAGE         STATUS         PORTS
+react-hello   hello-react   Up 4 seconds   0.0.0.0:3101->80/tcp, [::]:3101->80/tcp
+
+
+############################################################
+#  nginx-app
+############################################################
+
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world/nginx-app$ cat Dockerfile
+# Official Nginx image
+FROM nginx:alpine
+
+# nginx serves everything under this directory
+COPY index.html /usr/share/nginx/html/index.html
+
+EXPOSE 80
+# The base image already starts nginx in the foreground, so no CMD is needed.
+
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world/nginx-app$ docker build -t hello-nginx .
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
+
+Sending build context to Docker daemon  5.632kB
+Step 1/3 : FROM nginx:alpine
+ ---> a9ae6f6d078d
+Step 2/3 : COPY index.html /usr/share/nginx/html/index.html
+ ---> a0a087544042
+Step 3/3 : EXPOSE 80
+ ---> Running in 9bd83f75e8de
+ ---> Removed intermediate container 9bd83f75e8de
+ ---> d7ca75e793b4
+Successfully built d7ca75e793b4
+Successfully tagged hello-nginx:latest
+
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world/nginx-app$ docker run -d --name nginx-hello -p 8182:80 hello-nginx
+0517ca08f2c574af8e366f93a6d5ed0e4b4f2b7726a368378308fdbcb6b88f95
+
+kunal@kunal-devops:~/devops-homework/05-docker-hello-world/nginx-app$ docker ps --filter name=nginx-hello --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
+NAMES         IMAGE         STATUS         PORTS
+nginx-hello   hello-nginx   Up 4 seconds   0.0.0.0:8182->80/tcp, [::]:8182->80/tcp
+
+
+############################################################
+#  ALL SIX CONTAINERS RUNNING
+############################################################
+
+kunal@kunal-devops:~$ docker ps
+CONTAINER ID   IMAGE          COMMAND                  CREATED              STATUS              PORTS                                         NAMES
+0517ca08f2c5   hello-nginx    "/docker-entrypoint.…"   5 seconds ago        Up 4 seconds        0.0.0.0:8182->80/tcp, [::]:8182->80/tcp       nginx-hello
+78b99130ed0f   hello-react    "/docker-entrypoint.…"   9 seconds ago        Up 8 seconds        0.0.0.0:3101->80/tcp, [::]:3101->80/tcp       react-hello
+d9e798810f71   hello-apache   "httpd-foreground"       33 seconds ago       Up 32 seconds       0.0.0.0:8181->80/tcp, [::]:8181->80/tcp       apache-hello
+060fa82a28ce   hello-java     "/__cacert_entrypoin…"   43 seconds ago       Up 42 seconds       0.0.0.0:8180->8080/tcp, [::]:8180->8080/tcp   java-hello
+3120276c2415   hello-python   "python app.py"          About a minute ago   Up About a minute   0.0.0.0:5100->5000/tcp, [::]:5100->5000/tcp   python-hello
+2400edfec3bc   hello-nodejs   "docker-entrypoint.s…"   About a minute ago   Up About a minute   0.0.0.0:3100->3000/tcp, [::]:3100->3000/tcp   node-hello
+
+kunal@kunal-devops:~$ docker images | grep -E 'REPOSITORY|hello-'
+WARNING: This output is designed for human readability. For machine-readable output, please use --format.
+hello-apache:latest      e738b0fd797c        205MB         45.5MB   U    
+hello-java:latest        fed993be3872        474MB          113MB   U    
+hello-nginx:latest       d7ca75e793b4        102MB           29MB   U    
+hello-nodejs:latest      149be07f3208        210MB         51.6MB   U    
+hello-python:latest      3a364c35e12f        234MB         51.8MB   U    
+hello-react:latest       42494398b2bb        102MB         29.1MB   U    
+
+
+############################################################
+#  VERIFY EACH PAGE FROM THE COMMAND LINE
+############################################################
+
+kunal@kunal-devops:~$ curl -s http://localhost:3100 | grep -o '<h1>.*</h1>'
+<h1>Hello World from Node.js</h1>
+
+kunal@kunal-devops:~$ curl -s http://localhost:5100 | grep -o '<h1>.*</h1>'
+<h1>Hello World from Python</h1>
+
+kunal@kunal-devops:~$ curl -s http://localhost:8180 | grep -o '<h1>.*</h1>'
+<h1>Hello World from Java</h1>
+
+kunal@kunal-devops:~$ curl -s http://localhost:8181 | grep -o '<h1>.*</h1>'
+<h1>Hello World from Apache</h1>
+
+kunal@kunal-devops:~$ curl -s http://localhost:3101 | grep -o '<h1>.*</h1>'
+(no <h1> in the raw HTML - React renders its heading in the browser)
+
+kunal@kunal-devops:~$ curl -s http://localhost:8182 | grep -o '<h1>.*</h1>'
+<h1>Hello World from Nginx</h1>
+

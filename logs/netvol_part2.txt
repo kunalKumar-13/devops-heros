@@ -1,0 +1,156 @@
+
+############################################################
+#  TASK 3 (continued) - modify index.html on the HOST, container untouched
+############################################################
+
+kunal@kunal-devops:~$ cat /home/kunal/devops-homework/07-docker-networking-volumes/bind-mount/index.html
+<!doctype html>
+<html>
+  <head><title>Bind mount demo</title></head>
+  <body style="font-family: system-ui, sans-serif; text-align: center; padding-top: 80px;">
+    <h1>Hello students</h1>
+    <p>This line was added on the host while the container kept running &mdash; no restart needed.</p>
+  </body>
+</html>
+
+kunal@kunal-devops:~$ nano /home/kunal/devops-homework/07-docker-networking-volumes/bind-mount/index.html      # (edited here with a heredoc so the session is reproducible)
+
+kunal@kunal-devops:~$ cat /home/kunal/devops-homework/07-docker-networking-volumes/bind-mount/index.html
+<!doctype html>
+<html>
+  <head><title>Bind mount demo</title></head>
+  <body style="font-family: system-ui, sans-serif; text-align: center; padding-top: 80px;">
+    <h1>Hello students</h1>
+    <p>This line was added on the host while the container kept running &mdash; no restart needed.</p>
+  </body>
+</html>
+
+--- same container, no restart, no rebuild ---
+kunal@kunal-devops:~$ curl -s http://localhost:8090
+<!doctype html>
+<html>
+  <head><title>Bind mount demo</title></head>
+  <body style="font-family: system-ui, sans-serif; text-align: center; padding-top: 80px;">
+    <h1>Hello students</h1>
+    <p>This line was added on the host while the container kept running &mdash; no restart needed.</p>
+  </body>
+</html>
+
+kunal@kunal-devops:~$ docker ps --filter name=nginx-bind --format '{{.Names}} has been {{.Status}}'
+nginx-bind has been Up 5 seconds
+
+>>> The edit is live immediately. A bind mount is the SAME file on disk,
+>>> not a copy, so there is nothing to sync.
+kunal@kunal-devops:~$ docker exec nginx-bind cat /usr/share/nginx/html/index.html | head -n 6
+<!doctype html>
+<html>
+  <head><title>Bind mount demo</title></head>
+  <body style="font-family: system-ui, sans-serif; text-align: center; padding-top: 80px;">
+    <h1>Hello students</h1>
+    <p>This line was added on the host while the container kept running &mdash; no restart needed.</p>
+
+Read-only from the container's side (:ro), so it cannot modify the host file:
+kunal@kunal-devops:~$ docker exec nginx-bind sh -c 'echo hacked >> /usr/share/nginx/html/index.html'
+sh: can't create /usr/share/nginx/html/index.html: Read-only file system
+(exit code: 1)
+
+
+############################################################
+#  TASK 3b - named volume, for comparison
+############################################################
+
+kunal@kunal-devops:~$ docker volume create appdata
+appdata
+
+kunal@kunal-devops:~$ docker volume ls
+DRIVER    VOLUME NAME
+local     0fef52d9de1a1efdc176b87917c666c6e8c508f88f027f93b9f65c87e74e8b23
+local     appdata
+
+kunal@kunal-devops:~$ docker volume inspect appdata
+[
+    {
+        "CreatedAt": "2026-09-03T22:14:56+05:30",
+        "Driver": "local",
+        "Labels": null,
+        "Mountpoint": "/var/lib/docker/volumes/appdata/_data",
+        "Name": "appdata",
+        "Options": null,
+        "Scope": "local"
+    }
+]
+
+kunal@kunal-devops:~$ docker run --rm -v appdata:/data alpine sh -c 'echo "written inside a named volume" > /data/note.txt; cat /data/note.txt'
+written inside a named volume
+
+kunal@kunal-devops:~$ docker run --rm -v appdata:/data alpine cat /data/note.txt
+written inside a named volume
+
+>>> A different container saw the same data - the volume outlived the first container.
+
+############################################################
+#  TASK 4 - Overlay network (live)
+############################################################
+
+kunal@kunal-devops:~$ docker swarm init 2>&1 | head -n 3
+Swarm initialized: current node (onl1xoqu7ointzd09mi8wyavf) is now a manager.
+
+To add a worker to this swarm, run the following command:
+
+kunal@kunal-devops:~$ docker network create -d overlay --attachable my-overlay
+z0eycxibex1atx3rf7qv8edh6
+
+kunal@kunal-devops:~$ docker network ls --filter driver=overlay
+NETWORK ID     NAME         DRIVER    SCOPE
+okdv6njtwism   ingress      overlay   swarm
+z0eycxibex1a   my-overlay   overlay   swarm
+
+kunal@kunal-devops:~$ docker network inspect my-overlay --format 'name={{.Name}} driver={{.Driver}} scope={{.Scope}} subnet={{range .IPAM.Config}}{{.Subnet}}{{end}}'
+name=my-overlay driver=overlay scope=swarm subnet=10.0.1.0/24
+
+kunal@kunal-devops:~$ docker service create --name overlay-web --network my-overlay --replicas 2 nginx:alpine 2>&1 | tail -n 3
+verify: Waiting 1 seconds to verify that tasks are stable...
+verify: Waiting 1 seconds to verify that tasks are stable...
+verify: Service brevv1ahgo2m6e4w5kyfsfxv8 converged
+
+kunal@kunal-devops:~$ docker service ls
+ID             NAME          MODE         REPLICAS   IMAGE          PORTS
+brevv1ahgo2m   overlay-web   replicated   2/2        nginx:alpine   
+
+kunal@kunal-devops:~$ docker service ps overlay-web --format 'table {{.Name}}\t{{.Node}}\t{{.CurrentState}}'
+NAME            NODE           CURRENT STATE
+overlay-web.1   kunal-devops   Running 13 seconds ago
+overlay-web.2   kunal-devops   Running 13 seconds ago
+
+kunal@kunal-devops:~$ docker node ls
+ID                            HOSTNAME       STATUS    AVAILABILITY   MANAGER STATUS   ENGINE VERSION
+onl1xoqu7ointzd09mi8wyavf *   kunal-devops   Ready     Active         Leader           29.1.3
+
+kunal@kunal-devops:~$ docker run --rm --network my-overlay alpine sh -c 'nslookup overlay-web 2>&1 | tail -n 4; wget -qO- http://overlay-web | head -n 5'
+Address: 10.0.1.2
+
+Non-authoritative answer:
+
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+
+kunal@kunal-devops:~$ sudo ss -ulnp | grep 4789 || echo '(VXLAN port 4789 is opened per-network when tasks are scheduled)'
+UNCONN 0      0                0.0.0.0:4789      0.0.0.0:*                                              
+
+
+############################################################
+#  Cleanup of the swarm demo
+############################################################
+
+kunal@kunal-devops:~$ docker service rm overlay-web
+overlay-web
+
+kunal@kunal-devops:~$ docker network rm my-overlay
+my-overlay
+
+kunal@kunal-devops:~$ docker swarm leave --force
+Node left the swarm.
+

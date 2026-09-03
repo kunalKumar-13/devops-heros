@@ -1,0 +1,199 @@
+
+############################################################
+#  Step 0. Create the repository
+############################################################
+
+kunal@kunal-devops:~/gitlab2$ git init -b main
+Initialized empty Git repository in /home/kunal/gitlab2/.git/
+
+kunal@kunal-devops:~/gitlab2$ git config user.name 'Kunal Kumar'
+
+kunal@kunal-devops:~/gitlab2$ git config user.email 'kunalsain0324@gmail.com'
+
+
+############################################################
+#  Step 1. Make 4 commits on main
+############################################################
+
+kunal@kunal-devops:~/gitlab2$ echo 'Project: Cherry-pick demo' > README.md && git add README.md && git commit -m 'main commit 1: add README'
+[main (root-commit) 01bed48] main commit 1: add README
+ 1 file changed, 1 insertion(+)
+ create mode 100644 README.md
+
+kunal@kunal-devops:~/gitlab2$ echo 'v1.0' > VERSION && git add VERSION && git commit -m 'main commit 2: add VERSION file'
+[main a277980] main commit 2: add VERSION file
+ 1 file changed, 1 insertion(+)
+ create mode 100644 VERSION
+
+kunal@kunal-devops:~/gitlab2$ echo 'node_modules/' > .gitignore && git add .gitignore && git commit -m 'main commit 3: add .gitignore'
+[main 06cdbae] main commit 3: add .gitignore
+ 1 file changed, 1 insertion(+)
+ create mode 100644 .gitignore
+
+kunal@kunal-devops:~/gitlab2$ echo 'MIT License' > LICENSE && git add LICENSE && git commit -m 'main commit 4: add LICENSE'
+[main acd7d1c] main commit 4: add LICENSE
+ 1 file changed, 1 insertion(+)
+ create mode 100644 LICENSE
+
+
+############################################################
+#  Step 2. View the commits with git log
+############################################################
+
+kunal@kunal-devops:~/gitlab2$ git log --oneline
+acd7d1c main commit 4: add LICENSE
+06cdbae main commit 3: add .gitignore
+a277980 main commit 2: add VERSION file
+01bed48 main commit 1: add README
+
+kunal@kunal-devops:~/gitlab2$ git log --graph --oneline --all
+* acd7d1c main commit 4: add LICENSE
+* 06cdbae main commit 3: add .gitignore
+* a277980 main commit 2: add VERSION file
+* 01bed48 main commit 1: add README
+
+
+############################################################
+#  Step 3. Create a new branch
+############################################################
+
+kunal@kunal-devops:~/gitlab2$ git branch feature
+
+kunal@kunal-devops:~/gitlab2$ git checkout feature
+Switched to branch 'feature'
+
+kunal@kunal-devops:~/gitlab2$ git branch -v
+* feature acd7d1c main commit 4: add LICENSE
+  main    acd7d1c main commit 4: add LICENSE
+
+
+############################################################
+#  Step 4. Make 3 commits on the new branch
+############################################################
+
+kunal@kunal-devops:~/gitlab2$ echo 'function login() {}' > auth.js && git add auth.js && git commit -m 'feature commit 1: add auth.js'
+[feature 168cbe1] feature commit 1: add auth.js
+ 1 file changed, 1 insertion(+)
+ create mode 100644 auth.js
+
+kunal@kunal-devops:~/gitlab2$ printf 'BUGFIX: correct the typo in the README title\n' >> README.md && git add README.md && git commit -m 'feature commit 2: FIX README typo (this is the one to cherry-pick)'
+[feature 988b4de] feature commit 2: FIX README typo (this is the one to cherry-pick)
+ 1 file changed, 1 insertion(+)
+
+kunal@kunal-devops:~/gitlab2$ echo 'function logout() {}' >> auth.js && git add auth.js && git commit -m 'feature commit 3: add logout to auth.js'
+[feature c856b5a] feature commit 3: add logout to auth.js
+ 1 file changed, 1 insertion(+)
+
+
+############################################################
+#  Step 5. git log - identify the specific commit
+############################################################
+
+kunal@kunal-devops:~/gitlab2$ git log --oneline
+c856b5a feature commit 3: add logout to auth.js
+988b4de feature commit 2: FIX README typo (this is the one to cherry-pick)
+168cbe1 feature commit 1: add auth.js
+acd7d1c main commit 4: add LICENSE
+06cdbae main commit 3: add .gitignore
+a277980 main commit 2: add VERSION file
+01bed48 main commit 1: add README
+
+kunal@kunal-devops:~/gitlab2$ git log --oneline main..feature
+c856b5a feature commit 3: add logout to auth.js
+988b4de feature commit 2: FIX README typo (this is the one to cherry-pick)
+168cbe1 feature commit 1: add auth.js
+
+The commit wanted on main is 'feature commit 2: FIX README typo'.
+kunal@kunal-devops:~/gitlab2$ PICK=$(git log --format='%h %s' | grep 'FIX README typo' | cut -d' ' -f1); echo "Chosen commit hash: $PICK"; echo $PICK > /tmp/pick_hash
+Chosen commit hash: 988b4de
+
+kunal@kunal-devops:~/gitlab2$ git show $(cat /tmp/pick_hash) --stat
+commit 988b4de23aca8ae598833fd9ef8d278231d987e3
+Author: Kunal Kumar <kunalsain0324@gmail.com>
+Date:   Thu Sep 3 22:10:20 2026 +0530
+
+    feature commit 2: FIX README typo (this is the one to cherry-pick)
+
+ README.md | 1 +
+ 1 file changed, 1 insertion(+)
+
+
+############################################################
+#  Step 6. Back to main, then cherry-pick that ONE commit
+############################################################
+
+kunal@kunal-devops:~/gitlab2$ git checkout main
+Switched to branch 'main'
+
+kunal@kunal-devops:~/gitlab2$ git log --oneline
+acd7d1c main commit 4: add LICENSE
+06cdbae main commit 3: add .gitignore
+a277980 main commit 2: add VERSION file
+01bed48 main commit 1: add README
+
+kunal@kunal-devops:~/gitlab2$ cat README.md
+Project: Cherry-pick demo
+
+main does NOT contain the fix yet.
+
+kunal@kunal-devops:~/gitlab2$ git cherry-pick $(cat /tmp/pick_hash)
+[main 283c949] feature commit 2: FIX README typo (this is the one to cherry-pick)
+ Date: Thu Sep 3 22:10:20 2026 +0530
+ 1 file changed, 1 insertion(+)
+
+
+############################################################
+#  Step 7. Verify the change is now on main
+############################################################
+
+kunal@kunal-devops:~/gitlab2$ git log --oneline
+283c949 feature commit 2: FIX README typo (this is the one to cherry-pick)
+acd7d1c main commit 4: add LICENSE
+06cdbae main commit 3: add .gitignore
+a277980 main commit 2: add VERSION file
+01bed48 main commit 1: add README
+
+kunal@kunal-devops:~/gitlab2$ cat README.md
+Project: Cherry-pick demo
+BUGFIX: correct the typo in the README title
+
+>>> The BUGFIX line is now in README.md on main.
+>>> auth.js from feature commits 1 and 3 was NOT brought across:
+kunal@kunal-devops:~/gitlab2$ ls
+LICENSE
+README.md
+VERSION
+
+kunal@kunal-devops:~/gitlab2$ git log --graph --oneline --all
+* c856b5a feature commit 3: add logout to auth.js
+* 988b4de feature commit 2: FIX README typo (this is the one to cherry-pick)
+* 168cbe1 feature commit 1: add auth.js
+| * 283c949 feature commit 2: FIX README typo (this is the one to cherry-pick)
+|/  
+* acd7d1c main commit 4: add LICENSE
+* 06cdbae main commit 3: add .gitignore
+* a277980 main commit 2: add VERSION file
+* 01bed48 main commit 1: add README
+
+kunal@kunal-devops:~/gitlab2$ git show HEAD --stat
+commit 283c949be2d1c93a210db1211a6257527eaf97db
+Author: Kunal Kumar <kunalsain0324@gmail.com>
+Date:   Thu Sep 3 22:10:20 2026 +0530
+
+    feature commit 2: FIX README typo (this is the one to cherry-pick)
+
+ README.md | 1 +
+ 1 file changed, 1 insertion(+)
+
+
+############################################################
+#  Step 8. Same change, two different hashes
+############################################################
+
+kunal@kunal-devops:~/gitlab2$ git log --format='%h %s' -n 1 main
+283c949 feature commit 2: FIX README typo (this is the one to cherry-pick)
+
+kunal@kunal-devops:~/gitlab2$ git log --format='%h %s' feature | grep 'FIX README typo'
+988b4de feature commit 2: FIX README typo (this is the one to cherry-pick)
+
+Same content and message, different parent -> different SHA. cherry-pick COPIES a commit.

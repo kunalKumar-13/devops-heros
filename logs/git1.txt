@@ -1,0 +1,135 @@
+
+############################################################
+#  Setup
+############################################################
+
+kunal@kunal-devops:~/gitlab1$ git init -b main
+Initialized empty Git repository in /home/kunal/gitlab1/.git/
+
+kunal@kunal-devops:~/gitlab1$ git config user.name 'Kunal Kumar'
+
+kunal@kunal-devops:~/gitlab1$ git config user.email 'kunalsain0324@gmail.com'
+
+kunal@kunal-devops:~/gitlab1$ echo 'first line' > file1.txt
+
+kunal@kunal-devops:~/gitlab1$ git add file1.txt
+
+kunal@kunal-devops:~/gitlab1$ git commit -m 'Initial commit: add file1.txt'
+[main (root-commit) d205c5f] Initial commit: add file1.txt
+ 1 file changed, 1 insertion(+)
+ create mode 100644 file1.txt
+
+kunal@kunal-devops:~/gitlab1$ git log --oneline
+d205c5f Initial commit: add file1.txt
+
+
+############################################################
+#  A. git commit -m   (WITHOUT -a)
+############################################################
+
+Modify a TRACKED file and create a NEW untracked file, then try to commit.
+kunal@kunal-devops:~/gitlab1$ echo 'second line' >> file1.txt
+
+kunal@kunal-devops:~/gitlab1$ echo 'I am new' > file2.txt
+
+kunal@kunal-devops:~/gitlab1$ git status --short
+ M file1.txt
+?? file2.txt
+
+Legend:  ' M' = tracked file modified but NOT staged      '??' = untracked
+
+kunal@kunal-devops:~/gitlab1$ git commit -m 'Try to commit without -a'
+On branch main
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   file1.txt
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	file2.txt
+
+no changes added to commit (use "git add" and/or "git commit -a")
+(exit code: 1)
+
+>>> Nothing was committed. 'git commit -m' only commits what is already STAGED,
+>>> and we never ran 'git add'.
+
+kunal@kunal-devops:~/gitlab1$ git log --oneline
+d205c5f Initial commit: add file1.txt
+
+
+############################################################
+#  B. git commit -a -m
+############################################################
+
+kunal@kunal-devops:~/gitlab1$ git commit -a -m 'Commit with -a: picks up the modified tracked file'
+[main 67c6487] Commit with -a: picks up the modified tracked file
+ 1 file changed, 1 insertion(+)
+
+kunal@kunal-devops:~/gitlab1$ git log --oneline
+67c6487 Commit with -a: picks up the modified tracked file
+d205c5f Initial commit: add file1.txt
+
+kunal@kunal-devops:~/gitlab1$ git status --short
+?? file2.txt
+
+>>> file1.txt (TRACKED + modified) was staged automatically and committed.
+>>> file2.txt is STILL untracked - '-a' does NOT add new files.
+
+############################################################
+#  C. A new file still needs git add
+############################################################
+
+kunal@kunal-devops:~/gitlab1$ git add file2.txt
+
+kunal@kunal-devops:~/gitlab1$ git commit -m 'Add file2.txt with git add + git commit -m'
+[main 7c676e8] Add file2.txt with git add + git commit -m
+ 1 file changed, 1 insertion(+)
+ create mode 100644 file2.txt
+
+kunal@kunal-devops:~/gitlab1$ git log --oneline
+7c676e8 Add file2.txt with git add + git commit -m
+67c6487 Commit with -a: picks up the modified tracked file
+d205c5f Initial commit: add file1.txt
+
+kunal@kunal-devops:~/gitlab1$ git status
+On branch main
+nothing to commit, working tree clean
+
+
+############################################################
+#  D. What -a is really equivalent to
+############################################################
+
+kunal@kunal-devops:~/gitlab1$ echo 'third line' >> file1.txt
+
+kunal@kunal-devops:~/gitlab1$ rm file2.txt
+
+kunal@kunal-devops:~/gitlab1$ git status --short
+ M file1.txt
+ D file2.txt
+
+'-a' stages modifications AND deletions of tracked files - watch file2.txt get deleted too:
+kunal@kunal-devops:~/gitlab1$ git commit -a -m 'Third line added and file2.txt deleted, both picked up by -a'
+[main 27d8672] Third line added and file2.txt deleted, both picked up by -a
+ 2 files changed, 1 insertion(+), 1 deletion(-)
+ delete mode 100644 file2.txt
+
+kunal@kunal-devops:~/gitlab1$ git show --stat HEAD
+commit 27d86725b4270a8da04afd60959a258a966c764f
+Author: Kunal Kumar <kunalsain0324@gmail.com>
+Date:   Thu Sep 3 22:10:20 2026 +0530
+
+    Third line added and file2.txt deleted, both picked up by -a
+
+ file1.txt | 1 +
+ file2.txt | 1 -
+ 2 files changed, 1 insertion(+), 1 deletion(-)
+
+kunal@kunal-devops:~/gitlab1$ git log --oneline
+27d8672 Third line added and file2.txt deleted, both picked up by -a
+7c676e8 Add file2.txt with git add + git commit -m
+67c6487 Commit with -a: picks up the modified tracked file
+d205c5f Initial commit: add file1.txt
+
