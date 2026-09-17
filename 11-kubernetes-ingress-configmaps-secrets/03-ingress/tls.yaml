@@ -1,0 +1,31 @@
+# TLS termination at the ingress. The controller serves the certificate from the
+# named Secret (type kubernetes.io/tls, keys tls.crt and tls.key) and talks plain
+# HTTP to the backend pod.
+#
+# Self-signed cert for the lab:
+#   openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+#     -keyout tls.key -out tls.crt -subj "/CN=kunal-devops.local"
+#   kubectl create secret tls web-tls --cert=tls.crt --key=tls.key
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web-tls-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - kunal-devops.local
+      secretName: web-tls
+  rules:
+    - host: kunal-devops.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-svc
+                port:
+                  number: 80

@@ -1,0 +1,115 @@
+# Three tiny nginx services whose index.html comes from a ConfigMap, so each one
+# answers with its own name and you can see which backend the Ingress picked.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pages
+data:
+  api.html: "API service -- routed by the Ingress"
+  shop.html: "SHOP service -- routed by the Ingress"
+  web.html: "WEB service -- the default backend"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: api }
+  template:
+    metadata:
+      labels: { app: api }
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports: [{ containerPort: 80 }]
+          envFrom:
+            - configMapRef: { name: app-config }   # from ../01-configmap
+          env:
+            - name: DB_PASSWORD                    # from ../02-secret
+              valueFrom:
+                secretKeyRef: { name: db-secret, key: DB_PASSWORD }
+          volumeMounts:
+            - name: page
+              mountPath: /usr/share/nginx/html
+      volumes:
+        - name: page
+          configMap:
+            name: pages
+            items: [{ key: api.html, path: index.html }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-svc
+spec:
+  selector: { app: api }
+  ports: [{ port: 80, targetPort: 80 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shop
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: shop }
+  template:
+    metadata:
+      labels: { app: shop }
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports: [{ containerPort: 80 }]
+          volumeMounts:
+            - name: page
+              mountPath: /usr/share/nginx/html
+      volumes:
+        - name: page
+          configMap:
+            name: pages
+            items: [{ key: shop.html, path: index.html }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shop-svc
+spec:
+  selector: { app: shop }
+  ports: [{ port: 80, targetPort: 80 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: web }
+  template:
+    metadata:
+      labels: { app: web }
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports: [{ containerPort: 80 }]
+          volumeMounts:
+            - name: page
+              mountPath: /usr/share/nginx/html
+      volumes:
+        - name: page
+          configMap:
+            name: pages
+            items: [{ key: web.html, path: index.html }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-svc
+spec:
+  selector: { app: web }
+  ports: [{ port: 80, targetPort: 80 }]

@@ -1,0 +1,29 @@
+# Consuming a ConfigMap two ways at once.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: config-consumer
+spec:
+  containers:
+    - name: app
+      image: busybox:1.36
+      command: ["sh", "-c", "env | grep APP_; echo '---'; cat /etc/config/app.properties; sleep 3600"]
+      env:
+        - name: APP_GREETING          # one key -> one env var
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: APP_GREETING
+      envFrom:
+        - configMapRef:               # every key -> env vars of the same name
+            name: app-config
+      volumeMounts:
+        - name: config-volume
+          mountPath: /etc/config
+  volumes:
+    - name: config-volume
+      configMap:
+        name: app-config
+        items:
+          - key: app.properties       # mount just this key, as a file
+            path: app.properties
