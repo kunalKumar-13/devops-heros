@@ -1,0 +1,60 @@
+# Blue/green: two full Deployments live side by side. The Service selector is the
+# switch -- flip `version: blue` to `version: green` and 100% of traffic moves in
+# one atomic edit, with an instant rollback by flipping it back.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-blue
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: demo
+      version: blue
+  template:
+    metadata:
+      labels:
+        app: demo
+        version: blue
+    spec:
+      containers:
+        - name: app
+          image: nginx:1.26-alpine
+          ports:
+            - containerPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-green
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: demo
+      version: green
+  template:
+    metadata:
+      labels:
+        app: demo
+        version: green
+    spec:
+      containers:
+        - name: app
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-svc
+spec:
+  type: ClusterIP
+  selector:
+    app: demo
+    version: blue      # <-- the cutover:
+                       # kubectl patch svc app-svc -p '{"spec":{"selector":{"app":"demo","version":"green"}}}'
+  ports:
+    - port: 80
+      targetPort: 80

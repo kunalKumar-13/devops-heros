@@ -1,0 +1,33 @@
+# BROKEN ON PURPOSE. The readiness probe checks a path that returns 404, so the
+# pod is Running but never Ready. Consequence: the Service has no endpoints, and
+# a rolling update of this Deployment stalls forever instead of failing loudly
+# (until progressDeadlineSeconds marks it failed).
+#
+# Diagnose:
+#   kubectl get pods                      # 0/1 READY, status Running
+#   kubectl describe pod <pod>            # Readiness probe failed: HTTP 404
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: never-ready
+spec:
+  replicas: 2
+  progressDeadlineSeconds: 120
+  selector:
+    matchLabels:
+      app: never-ready
+  template:
+    metadata:
+      labels:
+        app: never-ready
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /healthz    # <-- nginx returns 404 here
+              port: 80
+            periodSeconds: 5

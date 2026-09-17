@@ -1,0 +1,33 @@
+# All three probes on one container, which is the combination worth memorising.
+#
+#   startupProbe    - runs FIRST and disables the other two until it passes.
+#                     For slow starters: gives 60s here (12 x 5s) without
+#                     forcing a lax livenessProbe forever after.
+#   readinessProbe  - FAILS -> pod is removed from Service endpoints but is NOT
+#                     restarted. This is the one that controls traffic.
+#   livenessProbe   - FAILS -> the container is KILLED and restarted.
+#
+# Getting these two backwards is the classic outage: a liveness probe pointed at
+# a dependency restarts healthy pods during someone else's incident.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: lifecycle-probes
+spec:
+  containers:
+    - name: app
+      image: nginx:1.27-alpine
+      ports:
+        - containerPort: 80
+      startupProbe:
+        httpGet: { path: /, port: 80 }
+        periodSeconds: 5
+        failureThreshold: 12
+      readinessProbe:
+        httpGet: { path: /, port: 80 }
+        periodSeconds: 5
+        failureThreshold: 3
+      livenessProbe:
+        httpGet: { path: /, port: 80 }
+        periodSeconds: 10
+        failureThreshold: 3

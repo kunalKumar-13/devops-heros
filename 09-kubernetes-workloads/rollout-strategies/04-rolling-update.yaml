@@ -1,0 +1,35 @@
+# The default strategy, spelled out. maxUnavailable: 0 with maxSurge: 1 is the
+# safe setting: capacity never dips, one extra pod at a time, and the readiness
+# probe gates each step.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rolling-demo
+spec:
+  replicas: 4
+  minReadySeconds: 5          # a pod must stay ready 5s before it counts
+  progressDeadlineSeconds: 120 # rollout is marked failed after 2 min of no progress
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: rolling-demo
+  template:
+    metadata:
+      labels:
+        app: rolling-demo
+    spec:
+      containers:
+        - name: app
+          image: nginx:1.26-alpine
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 2
+            periodSeconds: 3

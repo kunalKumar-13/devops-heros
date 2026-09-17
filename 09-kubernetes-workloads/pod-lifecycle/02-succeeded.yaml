@@ -1,0 +1,12 @@
+# Phase: Succeeded. The container exits 0 and restartPolicy: Never means the
+# kubelet leaves it alone. This is the shape of a one-shot job pod.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: lifecycle-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: work
+      image: busybox:1.36
+      command: ["sh", "-c", "echo work done; exit 0"]

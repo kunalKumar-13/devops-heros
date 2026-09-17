@@ -1,0 +1,37 @@
+# A Deployment owns ReplicaSets, and each ReplicaSet owns pods. Editing the pod
+# template creates a NEW ReplicaSet and scales the old one down -- that is a
+# rolling update, and keeping the old ReplicaSet around at zero replicas is what
+# makes `kubectl rollout undo` possible.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deploy
+  labels:
+    app: nginx-deploy
+spec:
+  replicas: 3
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: nginx-deploy
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0   # never drop below 3 ready pods
+      maxSurge: 1         # bring up at most one extra pod at a time
+  template:
+    metadata:
+      labels:
+        app: nginx-deploy
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          readinessProbe:      # without this the rollout has no idea what "ready" means
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 2
+            periodSeconds: 5
