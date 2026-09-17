@@ -1,0 +1,16 @@
+# NodePort: everything ClusterIP does, PLUS the same port opened on every node in
+# the cluster (default range 30000-32767). Reachable from outside as
+# <any-node-ip>:30080.
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-nodeport
+spec:
+  type: NodePort
+  selector:
+    app: web
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      nodePort: 30080   # omit this and Kubernetes allocates one for you

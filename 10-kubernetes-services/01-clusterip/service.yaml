@@ -1,0 +1,15 @@
+# ClusterIP (the default): a stable virtual IP reachable ONLY from inside the
+# cluster. kube-proxy programs the iptables/IPVS rules that DNAT that virtual IP
+# to one of the ready pod IPs.
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-clusterip
+spec:
+  type: ClusterIP
+  selector:
+    app: web
+  ports:
+    - name: http
+      port: 80          # the port the Service listens on
+      targetPort: 8080  # the port on the pod

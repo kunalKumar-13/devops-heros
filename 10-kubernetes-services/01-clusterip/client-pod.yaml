@@ -1,0 +1,11 @@
+# A throwaway client used to curl the ClusterIP by its DNS name from inside the
+# cluster. `sleep infinity` keeps it around to exec into.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: client
+spec:
+  containers:
+    - name: curl
+      image: curlimages/curl:8.10.1
+      command: ["sleep", "infinity"]

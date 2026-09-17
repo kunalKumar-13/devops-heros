@@ -1,0 +1,25 @@
+# Recreate: every old pod is terminated BEFORE any new pod starts. Guaranteed
+# downtime, but also a guarantee that v1 and v2 never run at the same time --
+# which is what you want when v2 applies an incompatible DB migration.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recreate-demo
+spec:
+  replicas: 3
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: recreate-demo
+  template:
+    metadata:
+      labels:
+        app: recreate-demo
+        version: v1
+    spec:
+      containers:
+        - name: app
+          image: nginx:1.26-alpine     # bump to 1.27-alpine to watch it recreate
+          ports:
+            - containerPort: 80

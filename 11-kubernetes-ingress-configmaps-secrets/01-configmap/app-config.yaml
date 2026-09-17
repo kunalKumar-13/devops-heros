@@ -1,0 +1,15 @@
+# Non-secret configuration, stored in plain text on purpose. Two shapes in one
+# object: individual keys (consumed as env vars) and a whole file (consumed as a
+# volume).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  APP_ENV: "production"
+  APP_GREETING: "Hello from a ConfigMap"
+  LOG_LEVEL: "info"
+  app.properties: |
+    server.port=8080
+    server.timeout=30s
+    feature.newCheckout=true

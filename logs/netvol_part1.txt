@@ -1,0 +1,288 @@
+
+############################################################
+#  TASK 1.1 - Create 3 different Docker networks
+############################################################
+
+kunal@kunal-devops:~$ docker network create frontend-net
+66e3c49e88a59b26ff24650a390af6d6b493db9a4836321fde8ec245e606c64b
+
+kunal@kunal-devops:~$ docker network create backend-net
+b698f5de6d51fc59d03a69208f848fe084925d0a1361acfb91fdb71d899da4c2
+
+kunal@kunal-devops:~$ docker network create monitoring-net
+7202969f2cfb01bce1a45495433553a5aeac6f2637f752c39c3caa35f250d3e8
+
+kunal@kunal-devops:~$ docker network ls
+NETWORK ID     NAME             DRIVER    SCOPE
+b698f5de6d51   backend-net      bridge    local
+b8ad9dfb8936   bridge           bridge    local
+66e3c49e88a5   frontend-net     bridge    local
+d9b65d2048a5   host             host      local
+7202969f2cfb   monitoring-net   bridge    local
+2e3ae2bb1d34   none             null      local
+
+
+############################################################
+#  TASK 1.2 - Create the 3 containers
+############################################################
+
+kunal@kunal-devops:~$ docker run -d --name frontend --network frontend-net nginx:alpine
+098cd13e909c800551c867576f6fee2a84c423bd10f26214f7dcd6b47bc95a25
+
+kunal@kunal-devops:~$ docker run -d --name backend  --network frontend-net alpine sleep 3600
+Unable to find image 'alpine:latest' locally
+latest: Pulling from library/alpine
+df8ce8557afe: Download complete
+aa3ec251a2db: Download complete
+Digest: sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+Status: Downloaded newer image for alpine:latest
+feb780167db09260caaa512677e1a814990e8590b46b42e2f76765d72c1b43df
+
+kunal@kunal-devops:~$ docker run -d --name database --network backend-net -e MYSQL_ROOT_PASSWORD=rootpass -e MYSQL_DATABASE=appdb mysql:8
+Unable to find image 'mysql:8' locally
+8: Pulling from library/mysql
+1ff71ea7626e: Pulling fs layer
+19c1e4d5e56d: Pulling fs layer
+c1a8d43326b8: Pulling fs layer
+8a905d3b3fdf: Pulling fs layer
+ac21e899ba1c: Pulling fs layer
+3d7f10ed4edf: Pulling fs layer
+26eb9d6698f0: Pulling fs layer
+d3c86b417a74: Pulling fs layer
+bec4c5f6b46d: Pulling fs layer
+b12e28485eff: Pulling fs layer
+b12e28485eff: Download complete
+8a905d3b3fdf: Download complete
+1ff71ea7626e: Download complete
+26eb9d6698f0: Download complete
+d3c86b417a74: Download complete
+3d7f10ed4edf: Download complete
+64896815bd4e: Download complete
+ac21e899ba1c: Download complete
+541dad502f35: Download complete
+c1a8d43326b8: Download complete
+8a905d3b3fdf: Pull complete
+c1a8d43326b8: Pull complete
+1ff71ea7626e: Pull complete
+d3c86b417a74: Pull complete
+3d7f10ed4edf: Pull complete
+ac21e899ba1c: Pull complete
+bec4c5f6b46d: Download complete
+b12e28485eff: Pull complete
+bec4c5f6b46d: Pull complete
+19c1e4d5e56d: Download complete
+19c1e4d5e56d: Pull complete
+26eb9d6698f0: Pull complete
+Digest: sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb
+Status: Downloaded newer image for mysql:8
+95189bada9674b4639076877f185b295070da52f50833d5d39e3e89d4debc589
+
+kunal@kunal-devops:~$ docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
+NAMES            IMAGE              STATUS
+database         mysql:8            Up Less than a second
+backend          alpine             Up 36 seconds
+frontend         nginx:alpine       Up 41 seconds
+go-multistage    go-multistage      Up 44 seconds
+multistage-app   multistage-hello   Up About a minute
+nginx-hello      hello-nginx        Up About a minute
+react-hello      hello-react        Up 2 minutes
+apache-hello     hello-apache       Up 2 minutes
+java-hello       hello-java         Up 2 minutes
+python-hello     hello-python       Up 3 minutes
+node-hello       hello-nodejs       Up 3 minutes
+
+
+############################################################
+#  TASK 1.3 - Add the backend container to a SECOND network
+############################################################
+
+kunal@kunal-devops:~$ docker network connect backend-net backend
+
+kunal@kunal-devops:~$ docker inspect backend --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}={{$v.IPAddress}} {{end}}'
+backend-net=172.19.0.3 frontend-net=172.18.0.3 
+
+kunal@kunal-devops:~$ docker exec backend ip -brief addr
+BusyBox v1.37.0 (2026-01-10 15:38:28 UTC) multi-call binary.
+
+Usage: ip [OPTIONS] address|route|link|tunnel|neigh|rule [ARGS]
+
+OPTIONS := -f[amily] inet|inet6|link | -o[neline]
+
+ip addr add|del IFADDR dev IFACE | show|flush [dev IFACE] [to PREFIX]
+ip route list|flush|add|del|change|append|replace|test ROUTE
+ip link set IFACE [up|down] [arp on|off] [multicast on|off]
+	[promisc on|off] [mtu NUM] [name NAME] [qlen NUM] [address MAC]
+	[master IFACE | nomaster] [netns PID]
+ip tunnel add|change|del|show [NAME]
+	[mode ipip|gre|sit] [remote ADDR] [local ADDR] [ttl TTL]
+ip neigh show|flush [to PREFIX] [dev DEV] [nud STATE]
+ip rule [list] | add|del SELECTOR ACTION
+
+
+############################################################
+#  TASK 1.4 - Which container sits on which network
+############################################################
+
+kunal@kunal-devops:~$ docker network inspect frontend-net --format 'frontend-net -> {{range .Containers}}{{.Name}} ({{.IPv4Address}}) {{end}}'
+frontend-net -> frontend (172.18.0.2/16) backend (172.18.0.3/16) 
+
+kunal@kunal-devops:~$ docker network inspect backend-net --format 'backend-net -> {{range .Containers}}{{.Name}} ({{.IPv4Address}}) {{end}}'
+backend-net -> database (172.19.0.2/16) backend (172.19.0.3/16) 
+
+kunal@kunal-devops:~$ docker network inspect monitoring-net --format 'monitoring-net -> {{range .Containers}}{{.Name}} ({{.IPv4Address}}) {{end}}'
+monitoring-net -> 
+
+
+############################################################
+#  TASK 1.5 - Check connectivity between the containers
+############################################################
+
+>>> backend -> frontend   (both on frontend-net)   expected: SUCCESS
+kunal@kunal-devops:~$ docker exec backend ping -c 2 frontend
+PING frontend (172.18.0.2): 56 data bytes
+64 bytes from 172.18.0.2: seq=0 ttl=64 time=0.489 ms
+64 bytes from 172.18.0.2: seq=1 ttl=64 time=0.350 ms
+
+--- frontend ping statistics ---
+2 packets transmitted, 2 packets received, 0% packet loss
+round-trip min/avg/max = 0.350/0.419/0.489 ms
+
+>>> backend -> database   (both on backend-net)    expected: SUCCESS
+kunal@kunal-devops:~$ docker exec backend ping -c 2 database
+PING database (172.19.0.2): 56 data bytes
+64 bytes from 172.19.0.2: seq=0 ttl=64 time=0.181 ms
+64 bytes from 172.19.0.2: seq=1 ttl=64 time=0.250 ms
+
+--- database ping statistics ---
+2 packets transmitted, 2 packets received, 0% packet loss
+round-trip min/avg/max = 0.181/0.215/0.250 ms
+
+>>> frontend -> backend   (both on frontend-net)   expected: SUCCESS
+kunal@kunal-devops:~$ docker exec frontend ping -c 2 backend
+PING backend (172.18.0.3): 56 data bytes
+64 bytes from 172.18.0.3: seq=0 ttl=64 time=0.108 ms
+64 bytes from 172.18.0.3: seq=1 ttl=64 time=0.217 ms
+
+--- backend ping statistics ---
+2 packets transmitted, 2 packets received, 0% packet loss
+round-trip min/avg/max = 0.108/0.162/0.217 ms
+
+>>> frontend -> database  (NO shared network)      expected: FAILURE
+kunal@kunal-devops:~$ docker exec frontend ping -c 2 database
+ping: bad address 'database'
+(exit code: 1)
+
+Docker's embedded DNS resolves container names, but only within a shared network:
+kunal@kunal-devops:~$ docker exec backend nslookup frontend 2>&1 | tail -n 4
+Non-authoritative answer:
+Name:	frontend
+Address: 172.18.0.2
+
+
+kunal@kunal-devops:~$ docker exec backend nslookup database 2>&1 | tail -n 4
+Address: 172.19.0.2
+
+Non-authoritative answer:
+
+
+kunal@kunal-devops:~$ docker exec backend sh -c 'nc -z -w 3 database 3306 && echo "port 3306 on database is OPEN from backend"'
+port 3306 on database is OPEN from backend
+
+kunal@kunal-devops:~$ docker exec backend sh -c 'nc -z -w 3 frontend 80 && echo "port 80 on frontend is OPEN from backend"'
+port 80 on frontend is OPEN from backend
+
+
+############################################################
+#  TASK 2 - Host network: Apache2 on port 80
+############################################################
+
+kunal@kunal-devops:~$ docker pull httpd:2.4
+2.4: Pulling from library/httpd
+Digest: sha256:979c38c2228d28c2edfd45c6e27dcee1c7b4a101a5526721ae8ece454e89e99e
+Status: Image is up to date for httpd:2.4
+docker.io/library/httpd:2.4
+
+kunal@kunal-devops:~$ docker run -d --name apache-host --network host httpd:2.4
+9b2a4feedce24875492fc83ffcaecc315bc563295fc875cd03df31e6acb25927
+
+kunal@kunal-devops:~$ docker ps --filter name=apache-host --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
+NAMES         IMAGE       STATUS         PORTS
+apache-host   httpd:2.4   Up 4 seconds   
+
+With --network host there is NO -p flag and the PORTS column is empty:
+the container shares the host's network namespace and binds port 80 directly.
+
+kunal@kunal-devops:~$ curl -s -I http://localhost:80
+HTTP/1.1 200 OK
+Date: Thu, 03 Sep 2026 16:44:50 GMT
+Server: Apache/2.4.68 (Unix)
+Last-Modified: Fri, 07 Nov 2025 08:23:08 GMT
+ETag: "bf-642fce432f300"
+Accept-Ranges: bytes
+Content-Length: 191
+Content-Type: text/html
+
+
+kunal@kunal-devops:~$ curl -s http://localhost:80
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<title>It works! Apache httpd</title>
+</head>
+<body>
+<p>It works!</p>
+</body>
+</html>
+
+kunal@kunal-devops:~$ sudo ss -tlnp | grep ':80 '
+LISTEN 0      511                *:80               *:*    users:(("httpd",pid=25583,fd=4),("httpd",pid=25582,fd=4),("httpd",pid=25581,fd=4),("httpd",pid=25566,fd=4))
+
+kunal@kunal-devops:~$ docker exec apache-host hostname
+kunal-devops
+
+kunal@kunal-devops:~$ hostname
+kunal-devops
+
+Same hostname inside and outside - the network namespace really is shared.
+
+############################################################
+#  TASK 3 - Bind mount
+############################################################
+
+kunal@kunal-devops:~$ ls -la /home/kunal/devops-homework/07-docker-networking-volumes/bind-mount
+total 12
+drwxrwxr-x 2 kunal kunal 4096 Sep  3 22:09 .
+drwxrwxr-x 4 kunal kunal 4096 Sep  3 22:09 ..
+-rw-rw-r-- 1 kunal kunal  310 Sep  3 22:09 index.html
+
+kunal@kunal-devops:~$ cat /home/kunal/devops-homework/07-docker-networking-volumes/bind-mount/index.html
+<!doctype html>
+<html>
+  <head><title>Bind mount demo</title></head>
+  <body style="font-family: system-ui, sans-serif; text-align: center; padding-top: 80px;">
+    <h1>Hello students</h1>
+    <p>This line was added on the host while the container kept running &mdash; no restart needed.</p>
+  </body>
+</html>
+
+kunal@kunal-devops:~$ docker run -d --name nginx-bind -p 8090:80 -v /home/kunal/devops-homework/07-docker-networking-volumes/bind-mount:/usr/share/nginx/html:ro nginx:alpine
+42e883473bebb3fb52797ca36c09c6eb34eb907c582fa607a13dc9fca57af037
+
+kunal@kunal-devops:~$ docker ps --filter name=nginx-bind --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+NAMES        STATUS         PORTS
+nginx-bind   Up 4 seconds   0.0.0.0:8090->80/tcp, [::]:8090->80/tcp
+
+kunal@kunal-devops:~$ docker inspect nginx-bind --format '{{range .Mounts}}{{.Type}}: {{.Source}} -> {{.Destination}} (rw={{.RW}}){{end}}'
+bind: /home/kunal/devops-homework/07-docker-networking-volumes/bind-mount -> /usr/share/nginx/html (rw=false)
+
+--- the container serves the file straight from the host folder ---
+kunal@kunal-devops:~$ curl -s http://localhost:8090
+<!doctype html>
+<html>
+  <head><title>Bind mount demo</title></head>
+  <body style="font-family: system-ui, sans-serif; text-align: center; padding-top: 80px;">
+    <h1>Hello students</h1>
+    <p>This line was added on the host while the container kept running &mdash; no restart needed.</p>
+  </body>
+</html>
+

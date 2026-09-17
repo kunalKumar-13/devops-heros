@@ -1,0 +1,24 @@
+# A ReplicaSet keeps exactly .spec.replicas pods matching .spec.selector alive.
+# It has no rollout logic -- change the image here and existing pods are NOT
+# replaced. That gap is why you almost always use a Deployment instead.
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: nginx-rs
+  labels:
+    app: nginx-rs
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx-rs
+  template:
+    metadata:
+      labels:
+        app: nginx-rs
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80

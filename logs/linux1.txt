@@ -1,0 +1,172 @@
+
+############################################################
+#  1. Create the original file
+############################################################
+
+kunal@kunal-devops:~/linklab$ echo 'Hello, this is the original file.' > original.txt
+
+kunal@kunal-devops:~/linklab$ cat original.txt
+Hello, this is the original file.
+
+kunal@kunal-devops:~/linklab$ ls -li
+total 4
+525715 -rw-rw-r-- 1 kunal kunal 34 Sep  3 22:10 original.txt
+
+
+############################################################
+#  2. Create a HARD link
+############################################################
+
+kunal@kunal-devops:~/linklab$ ln original.txt hardlink.txt
+
+kunal@kunal-devops:~/linklab$ ls -li
+total 8
+525715 -rw-rw-r-- 2 kunal kunal 34 Sep  3 22:10 hardlink.txt
+525715 -rw-rw-r-- 2 kunal kunal 34 Sep  3 22:10 original.txt
+
+Both names now share the SAME inode, and the link count went from 1 to 2.
+
+############################################################
+#  3. Create a SOFT (symbolic) link
+############################################################
+
+kunal@kunal-devops:~/linklab$ ln -s original.txt softlink.txt
+
+kunal@kunal-devops:~/linklab$ ls -li
+total 8
+525715 -rw-rw-r-- 2 kunal kunal 34 Sep  3 22:10 hardlink.txt
+525715 -rw-rw-r-- 2 kunal kunal 34 Sep  3 22:10 original.txt
+525716 lrwxrwxrwx 1 kunal kunal 12 Sep  3 22:10 softlink.txt -> original.txt
+
+softlink.txt has its OWN inode, type 'l', and shows -> original.txt
+
+############################################################
+#  4. All three show the same content
+############################################################
+
+kunal@kunal-devops:~/linklab$ cat original.txt
+Hello, this is the original file.
+
+kunal@kunal-devops:~/linklab$ cat hardlink.txt
+Hello, this is the original file.
+
+kunal@kunal-devops:~/linklab$ cat softlink.txt
+Hello, this is the original file.
+
+
+############################################################
+#  5. Edit through the hard link - the data is shared
+############################################################
+
+kunal@kunal-devops:~/linklab$ echo 'Line added through the hard link.' >> hardlink.txt
+
+kunal@kunal-devops:~/linklab$ cat original.txt
+Hello, this is the original file.
+Line added through the hard link.
+
+
+############################################################
+#  6. Inspect the links
+############################################################
+
+kunal@kunal-devops:~/linklab$ stat original.txt | head -n 5
+  File: original.txt
+  size: 68        	Blocks: 8          IO Block: 4096   regular file
+Device: 253,1	Inode: 525715      Links: 2
+Access: (0664/-rw-rw-r--)  Uid: (  501/   kunal)   Gid: ( 1000/   kunal)
+Access: 2026-09-03 22:10:05.042734737 +0530
+
+kunal@kunal-devops:~/linklab$ stat softlink.txt | head -n 5
+  File: 'softlink.txt' -> 'original.txt'
+  size: 12        	Blocks: 0          IO Block: 4096   symbolic link
+Device: 253,1	Inode: 525716      Links: 1
+Access: (0777/lrwxrwxrwx)  Uid: (  501/   kunal)   Gid: ( 1000/   kunal)
+Access: 2026-09-03 22:10:05.031736314 +0530
+
+kunal@kunal-devops:~/linklab$ readlink softlink.txt
+original.txt
+
+kunal@kunal-devops:~/linklab$ readlink -f softlink.txt
+/home/kunal/linklab/original.txt
+
+kunal@kunal-devops:~/linklab$ find . -inum $(stat -c %i original.txt)
+./original.txt
+./hardlink.txt
+
+
+############################################################
+#  7. DELETE the original file
+############################################################
+
+kunal@kunal-devops:~/linklab$ rm original.txt
+
+kunal@kunal-devops:~/linklab$ ls -li
+total 4
+525715 -rw-rw-r-- 1 kunal kunal 68 Sep  3 22:10 hardlink.txt
+525716 lrwxrwxrwx 1 kunal kunal 12 Sep  3 22:10 softlink.txt -> original.txt
+
+--- the HARD link still works ---
+kunal@kunal-devops:~/linklab$ cat hardlink.txt
+Hello, this is the original file.
+Line added through the hard link.
+
+--- the SOFT link is now BROKEN ---
+kunal@kunal-devops:~/linklab$ cat softlink.txt
+cat: softlink.txt: No such file or directory
+(exit code: 1)
+
+kunal@kunal-devops:~/linklab$ ls -l softlink.txt
+lrwxrwxrwx 1 kunal kunal 12 Sep  3 22:10 softlink.txt -> original.txt
+
+kunal@kunal-devops:~/linklab$ find . -xtype l
+./softlink.txt
+
+
+############################################################
+#  8. Restore the name and the soft link works again
+############################################################
+
+kunal@kunal-devops:~/linklab$ ln hardlink.txt original.txt
+
+kunal@kunal-devops:~/linklab$ cat softlink.txt
+Hello, this is the original file.
+Line added through the hard link.
+
+
+############################################################
+#  9. Hard links cannot cross filesystems or point at directories
+############################################################
+
+kunal@kunal-devops:~/linklab$ ln /tmp ~/linklab/dirlink
+ln: /tmp: hard link not allowed for directory
+(exit code: 1)
+
+kunal@kunal-devops:~/linklab$ ln -s /tmp dirsoftlink
+
+kunal@kunal-devops:~/linklab$ ls -l dirsoftlink
+lrwxrwxrwx 1 kunal kunal 4 Sep  3 22:10 dirsoftlink -> /tmp
+
+
+############################################################
+#  10. Deleting links
+############################################################
+
+kunal@kunal-devops:~/linklab$ rm softlink.txt
+
+kunal@kunal-devops:~/linklab$ unlink dirsoftlink
+
+kunal@kunal-devops:~/linklab$ rm hardlink.txt
+
+kunal@kunal-devops:~/linklab$ ls -li
+total 4
+525715 -rw-rw-r-- 1 kunal kunal 68 Sep  3 22:10 original.txt
+
+The file survives as original.txt - removing one hard link only decrements the count.
+kunal@kunal-devops:~/linklab$ rm original.txt
+
+kunal@kunal-devops:~/linklab$ ls -la
+total 8
+drwxrwxr-x  2 kunal kunal 4096 Sep  3 22:10 .
+drwxr-x--- 10 kunal kunal 4096 Sep  3 22:10 ..
+
+Link count reached 0, so the data is finally freed.

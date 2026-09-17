@@ -1,0 +1,377 @@
+
+############################################################
+#  1. INTERFACES AND IP ADDRESSES
+############################################################
+
+kunal@kunal-devops:~$ ip addr show
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host noprefixroute 
+       valid_lft forever preferred_lft forever
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000
+    link/ether 52:55:55:d5:eb:01 brd ff:ff:ff:ff:ff:ff
+    altname enx525555d5eb01
+    inet 192.168.5.15/24 metric 200 brd 192.168.5.255 scope global dynamic eth0
+       valid_lft 3411sec preferred_lft 3411sec
+    inet6 fe80::5055:55ff:fed5:eb01/64 scope link proto kernel_ll 
+       valid_lft forever preferred_lft forever
+3: docker0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN group default 
+    link/ether 72:5a:43:10:4f:ef brd ff:ff:ff:ff:ff:ff
+    inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0
+       valid_lft forever preferred_lft forever
+
+kunal@kunal-devops:~$ ip -brief addr
+lo               UNKNOWN        127.0.0.1/8 ::1/128 
+eth0             UP             192.168.5.15/24 metric 200 fe80::5055:55ff:fed5:eb01/64 
+docker0          DOWN           172.17.0.1/16 
+
+kunal@kunal-devops:~$ ip link show
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP mode DEFAULT group default qlen 1000
+    link/ether 52:55:55:d5:eb:01 brd ff:ff:ff:ff:ff:ff
+    altname enx525555d5eb01
+3: docker0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN mode DEFAULT group default 
+    link/ether 72:5a:43:10:4f:ef brd ff:ff:ff:ff:ff:ff
+
+kunal@kunal-devops:~$ ifconfig
+docker0: flags=4099<UP,BROADCAST,MULTICAST>  mtu 1500
+        inet 172.17.0.1  netmask 255.255.0.0  broadcast 172.17.255.255
+        ether 72:5a:43:10:4f:ef  txqueuelen 0  (Ethernet)
+        RX packets 0  bytes 0 (0.0 B)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 0  bytes 0 (0.0 B)
+        TX errors 0  dropped 2 overruns 0  carrier 0  collisions 0
+
+eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 192.168.5.15  netmask 255.255.255.0  broadcast 192.168.5.255
+        inet6 fe80::5055:55ff:fed5:eb01  prefixlen 64  scopeid 0x20<link>
+        ether 52:55:55:d5:eb:01  txqueuelen 1000  (Ethernet)
+        RX packets 90377  bytes 124053711 (124.0 MB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 9494  bytes 686533 (686.5 KB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+lo: flags=73<UP,LOOPBACK,RUNNING>  mtu 65536
+        inet 127.0.0.1  netmask 255.0.0.0
+        inet6 ::1  prefixlen 128  scopeid 0x10<host>
+        loop  txqueuelen 1000  (Local Loopback)
+        RX packets 142  bytes 12500 (12.5 KB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 142  bytes 12500 (12.5 KB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+
+kunal@kunal-devops:~$ hostname
+kunal-devops
+
+kunal@kunal-devops:~$ hostname -I
+192.168.5.15 172.17.0.1 
+
+
+############################################################
+#  2. ROUTING
+############################################################
+
+kunal@kunal-devops:~$ ip route
+default via 192.168.5.2 dev eth0 proto dhcp src 192.168.5.15 metric 200 
+172.17.0.0/16 dev docker0 proto kernel scope link src 172.17.0.1 linkdown 
+192.168.5.0/24 dev eth0 proto kernel scope link src 192.168.5.15 metric 200 
+192.168.5.2 dev eth0 proto dhcp scope link src 192.168.5.15 metric 200 
+
+kunal@kunal-devops:~$ route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         192.168.5.2     0.0.0.0         UG    200    0        0 eth0
+172.17.0.0      0.0.0.0         255.255.0.0     U     0      0        0 docker0
+192.168.5.0     0.0.0.0         255.255.255.0   U     200    0        0 eth0
+192.168.5.2     0.0.0.0         255.255.255.255 UH    200    0        0 eth0
+
+kunal@kunal-devops:~$ ip route get 8.8.8.8
+8.8.8.8 via 192.168.5.2 dev eth0 src 192.168.5.15 uid 501 
+    cache 
+
+
+############################################################
+#  3. DNS LOOKUPS
+############################################################
+
+kunal@kunal-devops:~$ nslookup github.com
+Server:		127.0.0.53
+Address:	127.0.0.53#53
+
+Non-authoritative answer:
+Name:	github.com
+Address: 20.207.73.82
+
+
+kunal@kunal-devops:~$ dig github.com +short
+20.207.73.82
+
+kunal@kunal-devops:~$ dig github.com
+
+; <<>> DiG 9.20.24-1ubuntu0.3-Ubuntu <<>> github.com
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 51736
+;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 65494
+;; QUESTION SECTION:
+;github.com.			IN	A
+
+;; ANSWER SECTION:
+github.com.		0	IN	A	20.207.73.82
+
+;; Query time: 0 msec
+;; SERVER: 127.0.0.53#53(127.0.0.53) (UDP)
+;; WHEN: Thu Sep 03 22:10:10 IST 2026
+;; MSG SIZE  rcvd: 55
+
+
+kunal@kunal-devops:~$ dig MX gmail.com +short
+5 gmail-smtp-in.l.google.com.
+10 alt1.gmail-smtp-in.l.google.com.
+20 alt2.gmail-smtp-in.l.google.com.
+30 alt3.gmail-smtp-in.l.google.com.
+40 alt4.gmail-smtp-in.l.google.com.
+
+kunal@kunal-devops:~$ dig NS google.com +short
+ns3.google.com.
+ns4.google.com.
+ns1.google.com.
+ns2.google.com.
+
+kunal@kunal-devops:~$ dig -x 8.8.8.8 @8.8.8.8 +short
+dns.google.
+
+kunal@kunal-devops:~$ host github.com
+github.com has address 20.207.73.82
+github.com mail is handled by 0 github-com.mail.protection.outlook.com.
+
+kunal@kunal-devops:~$ cat /etc/resolv.conf
+# This is /run/systemd/resolve/stub-resolv.conf managed by man:systemd-resolved(8).
+# Do not edit.
+#
+# This file might be symlinked as /etc/resolv.conf. If you're looking at
+# /etc/resolv.conf and seeing this text, you have followed the symlink.
+#
+# This is a dynamic resolv.conf file for connecting local clients to the
+# internal DNS stub resolver of systemd-resolved. This file lists all
+# configured search domains.
+#
+# Run "resolvectl status" to see details about the uplink DNS servers
+# currently in use.
+#
+# Third party programs should typically not access this file directly, but only
+# through the symlink at /etc/resolv.conf. To manage man:resolv.conf(5) in a
+# different way, replace this symlink by a static file or a different symlink.
+#
+# See man:systemd-resolved.service(8) for details about the supported modes of
+# operation for /etc/resolv.conf.
+
+nameserver 127.0.0.53
+options edns0 trust-ad
+search .
+
+kunal@kunal-devops:~$ cat /etc/hosts
+127.0.0.1 localhost
+
+# The following lines are desirable for IPv6 capable hosts
+::1 ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+ff00::0 ip6-mcastprefix
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+ff02::3 ip6-allhosts
+192.168.5.2	host.lima.internal
+
+
+############################################################
+#  4. OPEN PORTS AND SOCKETS
+############################################################
+
+kunal@kunal-devops:~$ ss -tuln
+Netid State  Recv-Q Send-Q     Local Address:Port  Peer Address:Port
+udp   UNCONN 0      0             127.0.0.54:53         0.0.0.0:*   
+udp   UNCONN 0      0          127.0.0.53%lo:53         0.0.0.0:*   
+udp   UNCONN 0      0      192.168.5.15%eth0:68         0.0.0.0:*   
+udp   UNCONN 0      0              127.0.0.1:323        0.0.0.0:*   
+udp   UNCONN 0      0                0.0.0.0:5353       0.0.0.0:*   
+udp   UNCONN 0      0                  [::1]:323           [::]:*   
+udp   UNCONN 0      0                   [::]:5353          [::]:*   
+tcp   LISTEN 0      4096       127.0.0.53%lo:53         0.0.0.0:*   
+tcp   LISTEN 0      4096             0.0.0.0:22         0.0.0.0:*   
+tcp   LISTEN 0      4096           127.0.0.1:40019      0.0.0.0:*   
+tcp   LISTEN 0      4096           127.0.0.1:44477      0.0.0.0:*   
+tcp   LISTEN 0      4096          127.0.0.54:53         0.0.0.0:*   
+tcp   LISTEN 0      4096                [::]:22            [::]:*   
+
+kunal@kunal-devops:~$ sudo ss -tulnp | head -n 12
+Netid State  Recv-Q Send-Q     Local Address:Port  Peer Address:PortProcess                                                 
+udp   UNCONN 0      0             127.0.0.54:53         0.0.0.0:*    users:(("systemd-resolve",pid=2108,fd=21))             
+udp   UNCONN 0      0          127.0.0.53%lo:53         0.0.0.0:*    users:(("systemd-resolve",pid=2108,fd=19))             
+udp   UNCONN 0      0      192.168.5.15%eth0:68         0.0.0.0:*    users:(("systemd-network",pid=1331,fd=32))             
+udp   UNCONN 0      0              127.0.0.1:323        0.0.0.0:*    users:(("chronyd",pid=1608,fd=4))                      
+udp   UNCONN 0      0                0.0.0.0:5353       0.0.0.0:*    users:(("systemd-resolve",pid=2108,fd=13))             
+udp   UNCONN 0      0                  [::1]:323           [::]:*    users:(("chronyd",pid=1608,fd=5))                      
+udp   UNCONN 0      0                   [::]:5353          [::]:*    users:(("systemd-resolve",pid=2108,fd=14))             
+tcp   LISTEN 0      4096       127.0.0.53%lo:53         0.0.0.0:*    users:(("systemd-resolve",pid=2108,fd=20))             
+tcp   LISTEN 0      4096             0.0.0.0:22         0.0.0.0:*    users:(("sshd",pid=1771,fd=3),("systemd",pid=1,fd=231))
+tcp   LISTEN 0      4096           127.0.0.1:40019      0.0.0.0:*    users:(("containerd",pid=9762,fd=5))                   
+tcp   LISTEN 0      4096           127.0.0.1:44477      0.0.0.0:*    users:(("containerd",pid=10995,fd=13))                 
+
+kunal@kunal-devops:~$ netstat -tuln | head -n 12
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State      
+tcp        0      0 127.0.0.53:53           0.0.0.0:*               LISTEN     
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN     
+tcp        0      0 127.0.0.1:40019         0.0.0.0:*               LISTEN     
+tcp        0      0 127.0.0.1:44477         0.0.0.0:*               LISTEN     
+tcp        0      0 127.0.0.54:53           0.0.0.0:*               LISTEN     
+tcp6       0      0 :::22                   :::*                    LISTEN     
+udp        0      0 127.0.0.54:53           0.0.0.0:*                          
+udp        0      0 127.0.0.53:53           0.0.0.0:*                          
+udp        0      0 192.168.5.15:68         0.0.0.0:*                          
+udp        0      0 127.0.0.1:323           0.0.0.0:*                          
+
+kunal@kunal-devops:~$ sudo netstat -tulnp | head -n 10
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
+tcp        0      0 127.0.0.53:53           0.0.0.0:*               LISTEN      2108/systemd-resolv 
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      1/systemd           
+tcp        0      0 127.0.0.1:40019         0.0.0.0:*               LISTEN      9762/containerd     
+tcp        0      0 127.0.0.1:44477         0.0.0.0:*               LISTEN      10995/containerd    
+tcp        0      0 127.0.0.54:53           0.0.0.0:*               LISTEN      2108/systemd-resolv 
+tcp6       0      0 :::22                   :::*                    LISTEN      1/systemd           
+udp        0      0 127.0.0.54:53           0.0.0.0:*                           2108/systemd-resolv 
+udp        0      0 127.0.0.53:53           0.0.0.0:*                           2108/systemd-resolv 
+
+kunal@kunal-devops:~$ ss -s
+Total: 248
+TCP:   9 (estab 0, closed 3, orphaned 0, timewait 3)
+
+Transport Total     IP        IPv6
+RAW	  1         0         1        
+UDP	  7         5         2        
+TCP	  6         5         1        
+INET	  14        10        4        
+FRAG	  0         0         0        
+
+
+kunal@kunal-devops:~$ sudo lsof -i :22 | head -n 4
+COMMAND  PID USER  FD   TYPE DEVICE SIZE/OFF NODE NAME
+systemd    1 root 231u  IPv4  17687      0t0  TCP *:ssh (LISTEN)
+systemd    1 root 232u  IPv6  20528      0t0  TCP *:ssh (LISTEN)
+sshd    1771 root   3u  IPv4  17687      0t0  TCP *:ssh (LISTEN)
+
+
+############################################################
+#  5. ARP / NEIGHBOUR TABLE
+############################################################
+
+kunal@kunal-devops:~$ ip neigh
+192.168.5.2 dev eth0 lladdr 5a:94:ef:e4:0c:dd REACHABLE 
+
+kunal@kunal-devops:~$ arp -n
+Address                  HWtype  HWaddress           Flags Mask            Iface
+192.168.5.2              ether   5a:94:ef:e4:0c:dd   C                     eth0
+
+
+############################################################
+#  6. HTTP CLIENTS
+############################################################
+
+kunal@kunal-devops:~$ curl -s -I https://example.com
+HTTP/2 200 
+date: Thu, 03 Sep 2026 16:40:10 GMT
+content-type: text/html
+server: cloudflare
+last-modified: Sun, 30 Aug 2026 04:11:49 GMT
+allow: GET, HEAD
+accept-ranges: bytes
+age: 1141
+cf-cache-status: HIT
+cf-ray: a35631da28edba20-MAA
+
+
+kunal@kunal-devops:~$ curl -s https://api.github.com/zen
+Mind your words, they are important.
+kunal@kunal-devops:~$ curl -s -o /dev/null -w 'http_code=%{http_code} time_total=%{time_total}s\n' https://github.com
+http_code=200 time_total=0.294853s
+
+kunal@kunal-devops:~$ wget -q -O - https://example.com | head -n 8
+<!doctype html><html lang="en"><head><title>Example Domain</title><link rel="icon" href="data:,"><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{background:#eee;width:60vw;margin:15vh auto;font-family:system-ui,sans-serif}h1{font-size:1.5em}div{opacity:0.8}a:link,a:visited{color:#348}</style></head><body><div><h1>Example Domain</h1><p>This domain is for use in documentation examples without needing permission. Avoid use in operations.</p><p><a href="https://iana.org/domains/example">Learn more</a></p></div></body></html>
+
+
+############################################################
+#  7. PORT CHECKS
+############################################################
+
+kunal@kunal-devops:~$ nc -zv github.com 443
+Connection to github.com (20.207.73.82) 443 port [tcp/https] succeeded!
+
+kunal@kunal-devops:~$ nc -zv github.com 22
+Connection to github.com (20.207.73.82) 22 port [tcp/ssh] succeeded!
+
+kunal@kunal-devops:~$ nc -zv github.com 12345
+nc: connect to github.com (20.207.73.82) port 12345 (tcp) timed out: Operation now in progress
+(exit code: 1 - a CLOSED port looks like this)
+
+kunal@kunal-devops:~$ timeout 5 telnet github.com 443 </dev/null 2>&1 | head -n 4
+Trying 20.207.73.82...
+Connected to github.com.
+Escape character is '^]'.
+Connection closed by foreign host.
+
+
+############################################################
+#  8. SCANNING AND PACKET CAPTURE
+############################################################
+
+kunal@kunal-devops:~$ nmap -F localhost
+Starting Nmap 7.98 ( https://nmap.org ) at 2026-09-03 22:10 +0530
+Nmap scan report for localhost (127.0.0.1)
+Host is up (0.00013s latency).
+Other addresses for localhost (not scanned): ::1
+Not shown: 99 closed tcp ports (conn-refused)
+PORT   STATE SERVICE
+22/tcp open  ssh
+
+Nmap done: 1 IP address (1 host up) scanned in 0.03 seconds
+
+kunal@kunal-devops:~$ sudo timeout 8 tcpdump -i any -c 6 -n port 53 & sleep 1; dig github.com +short >/dev/null; dig google.com +short >/dev/null; wait
+tcpdump: WARNING: any: That device doesn't support promiscuous mode
+(Promiscuous mode not supported on the "any" device)
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on any, link-type LINUX_SLL2 (Linux cooked v2), snapshot length 262144 bytes
+22:10:17.755963 lo    In  IP 127.0.0.1.42122 > 127.0.0.53.53: 60534+ [1au] A? github.com. (51)
+22:10:17.756316 eth0  Out IP 192.168.5.15.49487 > 192.168.5.2.53: 9430+ A? github.com. (28)
+22:10:17.757608 eth0  In  IP 192.168.5.2.53 > 192.168.5.15.49487: 9430 1/0/0 A 20.207.73.82 (54)
+22:10:17.757733 lo    In  IP 127.0.0.53.53 > 127.0.0.1.42122: 60534 1/0/1 A 20.207.73.82 (55)
+22:10:17.766137 lo    In  IP 127.0.0.1.39860 > 127.0.0.53.53: 64138+ [1au] A? google.com. (51)
+22:10:17.766330 eth0  Out IP 192.168.5.15.60180 > 192.168.5.2.53: 41319+ A? google.com. (28)
+6 packets captured
+12 packets received by filter
+0 packets dropped by kernel
+
+
+############################################################
+#  9. WHOIS
+############################################################
+
+kunal@kunal-devops:~$ whois github.com | head -n 10
+   Domain Name: GITHUB.COM
+   Registry Domain ID: 1264983250_DOMAIN_COM-VRSN
+   Registrar WHOIS Server: whois.markmonitor.com
+   Registrar URL: http://www.markmonitor.com
+   Updated Date: 2024-09-07T09:16:32Z
+   Creation Date: 2007-10-09T18:20:50Z
+   Registry Expiry Date: 2026-10-09T18:20:50Z
+   Registrar: MarkMonitor Inc.
+   Registrar IANA ID: 292
+   Registrar Abuse Contact Email: abusecomplaints@markmonitor.com
+

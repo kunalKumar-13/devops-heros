@@ -1,0 +1,196 @@
+
+############################################################
+#  0. The machine
+############################################################
+
+kunal@kunal-devops:~$ hostnamectl | head -n 6
+ Static hostname: kunal-devops
+       Icon name: computer-vm
+         Chassis: vm 🖴
+      Machine ID: df1003417c89478b8407647c4b045f66
+         Boot ID: 0556b71c1fd64acf9c195431391ebfa9
+    AF_VSOCK CID: 3
+
+kunal@kunal-devops:~$ systemctl --version | head -n 1
+systemd 259 (259.5-0ubuntu3)
+
+kunal@kunal-devops:~$ cat /etc/os-release | head -n 3
+PRETTY_NAME="Ubuntu 26.04 LTS"
+NAME="Ubuntu"
+VERSION_ID="26.04"
+
+
+############################################################
+#  1. Where the journal lives
+############################################################
+
+kunal@kunal-devops:~$ sudo journalctl --disk-usage
+Archived and active journals take up 8M in the file system.
+
+kunal@kunal-devops:~$ ls -la /var/log/journal
+total 12
+drwxr-sr-x+ 3 root systemd-journal 4096 Sep  3 22:06 .
+drwxrwxr-x 10 root syslog          4096 Sep  3 22:07 ..
+drwxr-sr-x+ 2 root systemd-journal 4096 Sep  3 22:09 df1003417c89478b8407647c4b045f66
+
+
+############################################################
+#  2. The most recent log lines
+############################################################
+
+kunal@kunal-devops:~$ sudo journalctl -n 12 --no-pager
+Sep 03 22:10:05 kunal-devops sshd-session[19173]: pam_unix(sshd:session): session opened for user kunal(uid=501) by kunal(uid=0)
+Sep 03 22:10:05 kunal-devops systemd-logind[1510]: New session '17' of user 'kunal' with class 'user' and type 'tty'.
+Sep 03 22:10:05 kunal-devops systemd[1]: Started session-17.scope - Session 17 of User kunal.
+Sep 03 22:10:05 kunal-devops dbus-daemon[1491]: [system] Activating via systemd: service name='org.freedesktop.hostname1' unit='dbus-org.freedesktop.hostname1.service' requested by ':1.38' (uid=501 pid=19225 comm="hostnamectl" label="unconfined")
+Sep 03 22:10:05 kunal-devops systemd[1]: Starting systemd-hostnamed.service - Hostname Service...
+Sep 03 22:10:05 kunal-devops systemd[1]: Started systemd-hostnamed.service - Hostname Service.
+Sep 03 22:10:05 kunal-devops dbus-daemon[1491]: [system] Successfully activated service 'org.freedesktop.hostname1'
+Sep 03 22:10:05 kunal-devops sudo[19240]: pam_unix(sudo:session): session opened for user root(uid=0) by kunal(uid=501)
+Sep 03 22:10:05 kunal-devops sudo[19240]: kunal :  PWD=/home/kunal ; USER=root ; COMMAND=/usr/bin/journalctl --disk-usage
+Sep 03 22:10:05 kunal-devops sudo[19240]: pam_unix(sudo:session): session closed for user root
+Sep 03 22:10:05 kunal-devops sudo[19248]: pam_unix(sudo:session): session opened for user root(uid=0) by kunal(uid=501)
+Sep 03 22:10:05 kunal-devops sudo[19248]: kunal :  PWD=/home/kunal ; USER=root ; COMMAND=/usr/bin/journalctl -n 12 --no-pager
+
+
+############################################################
+#  3. Logs since this boot
+############################################################
+
+kunal@kunal-devops:~$ sudo journalctl -b --no-pager | head -n 12
+Sep 03 22:09:56 kunal-devops systemd-journald[920]: System Journal (/var/log/journal/df1003417c89478b8407647c4b045f66) is 8M, max 240.8M, 232.8M free.
+Sep 03 22:09:56 kunal-devops systemd-journald[920]: Received client request to rotate journal, rotating.
+Sep 03 22:09:56 kunal-devops (cron)[18651]: cron.service: Referenced but unset environment variable evaluates to an empty string: EXTRA_OPTS
+Sep 03 22:09:56 kunal-devops cron[18651]: (CRON) INFO (pidfile fd = 3)
+Sep 03 22:09:56 kunal-devops systemd-journald[920]: Vacuuming done, freed 0B of archived journals from /var/log/journal/df1003417c89478b8407647c4b045f66.
+Sep 03 22:09:56 kunal-devops cron[18651]: (CRON) INFO (Skipping @reboot jobs -- not system startup)
+Sep 03 22:09:56 kunal-devops sudo[18652]: pam_unix(sudo:session): session closed for user root
+Sep 03 22:09:56 kunal-devops sudo[18656]: pam_unix(sudo:session): session opened for user root(uid=0) by kunal(uid=501)
+Sep 03 22:09:56 kunal-devops sudo[18656]: kunal :  PWD=/home/kunal ; USER=root ; COMMAND=/usr/bin/journalctl --vacuum-time=1s
+Sep 03 22:09:56 kunal-devops sudo[18656]: pam_unix(sudo:session): session closed for user root
+Sep 03 22:09:56 kunal-devops sshd-session[18623]: Received disconnect from UNKNOWN port 65535:11: disconnected by user
+Sep 03 22:09:56 kunal-devops sshd-session[18623]: Disconnected from user kunal UNKNOWN port 65535
+
+kunal@kunal-devops:~$ sudo journalctl --list-boots --no-pager
+IDX BOOT ID                          FIRST ENTRY                 LAST ENTRY
+  0 0556b71c1fd64acf9c195431391ebfa9 Thu 2026-09-03 22:09:56 IST Thu 2026-09-03 22:10:05 IST
+
+
+############################################################
+#  4. Logs for ONE service - ssh
+############################################################
+
+kunal@kunal-devops:~$ systemctl status ssh --no-pager | head -n 12
+● ssh.service - OpenBSD Secure Shell server
+     Loaded: loaded (/usr/lib/systemd/system/ssh.service; disabled; preset: enabled)
+     Active: active (running) since Thu 2026-09-03 22:07:01 IST; 3min 4s ago
+ Invocation: 395d410f927745b7b0ecf066a8fdd4c9
+TriggeredBy: ● ssh.socket
+       Docs: man:sshd(8)
+             man:sshd_config(5)
+   Main PID: 1771 (sshd)
+      Tasks: 1 (limit: 8568)
+     Memory: 1.2M (peak: 3.6M)
+        CPU: 28ms
+     CGroup: /system.slice/ssh.service
+
+kunal@kunal-devops:~$ sudo journalctl -u ssh --no-pager -n 12
+-- No entries --
+
+
+############################################################
+#  5. Restart a service and watch its new entries appear
+############################################################
+
+kunal@kunal-devops:~$ sudo systemctl restart cron
+
+kunal@kunal-devops:~$ sudo journalctl -u cron --no-pager -n 10
+Sep 03 22:09:56 kunal-devops (cron)[18651]: cron.service: Referenced but unset environment variable evaluates to an empty string: EXTRA_OPTS
+Sep 03 22:09:56 kunal-devops cron[18651]: (CRON) INFO (pidfile fd = 3)
+Sep 03 22:09:56 kunal-devops cron[18651]: (CRON) INFO (Skipping @reboot jobs -- not system startup)
+Sep 03 22:10:05 kunal-devops systemd[1]: Stopping cron.service - Regular background program processing daemon...
+Sep 03 22:10:05 kunal-devops systemd[1]: cron.service: Deactivated successfully.
+Sep 03 22:10:05 kunal-devops systemd[1]: Stopped cron.service - Regular background program processing daemon.
+Sep 03 22:10:05 kunal-devops systemd[1]: Started cron.service - Regular background program processing daemon.
+Sep 03 22:10:05 kunal-devops (cron)[19277]: cron.service: Referenced but unset environment variable evaluates to an empty string: EXTRA_OPTS
+Sep 03 22:10:05 kunal-devops cron[19277]: (CRON) INFO (pidfile fd = 3)
+Sep 03 22:10:05 kunal-devops cron[19277]: (CRON) INFO (Skipping @reboot jobs -- not system startup)
+
+
+############################################################
+#  6. Restart Docker and read its log too
+############################################################
+
+kunal@kunal-devops:~$ sudo systemctl restart docker
+
+kunal@kunal-devops:~$ sudo journalctl -u docker --no-pager -n 8
+Sep 03 22:10:05 kunal-devops dockerd[19289]: time="2026-09-03T22:10:05.839562279+05:30" level=info msg="Deleting nftables IPv6 rules" error="exit status 1"
+Sep 03 22:10:06 kunal-devops dockerd[19289]: time="2026-09-03T22:10:06.021038082+05:30" level=info msg="Loading containers: done."
+Sep 03 22:10:06 kunal-devops dockerd[19289]: time="2026-09-03T22:10:06.023744611+05:30" level=info msg="Docker daemon" commit=29.1.3-0ubuntu4.1 containerd-snapshotter=true storage-driver=overlayfs version=29.1.3
+Sep 03 22:10:06 kunal-devops dockerd[19289]: time="2026-09-03T22:10:06.023787605+05:30" level=info msg="Initializing buildkit"
+Sep 03 22:10:06 kunal-devops dockerd[19289]: time="2026-09-03T22:10:06.026295537+05:30" level=info msg="Completed buildkit initialization"
+Sep 03 22:10:06 kunal-devops dockerd[19289]: time="2026-09-03T22:10:06.028764682+05:30" level=info msg="Daemon has completed initialization"
+Sep 03 22:10:06 kunal-devops dockerd[19289]: time="2026-09-03T22:10:06.028794803+05:30" level=info msg="API listen on /run/docker.sock"
+Sep 03 22:10:06 kunal-devops systemd[1]: Started docker.service - Docker Application Container Engine.
+
+
+############################################################
+#  7. Filter by priority - errors and worse
+############################################################
+
+kunal@kunal-devops:~$ sudo journalctl -p err -b --no-pager | tail -n 10
+Sep 03 22:10:05 kunal-devops deluser[18927]: The user `testuser' does not exist.
+
+kunal@kunal-devops:~$ sudo journalctl -xe --no-pager | tail -n 6
+Sep 03 22:10:06 kunal-devops sudo[19486]: pam_unix(sudo:session): session closed for user root
+Sep 03 22:10:06 kunal-devops sudo[19491]: pam_unix(sudo:session): session opened for user root(uid=0) by kunal(uid=501)
+Sep 03 22:10:06 kunal-devops sudo[19491]: kunal :  PWD=/home/kunal ; USER=root ; COMMAND=/usr/bin/journalctl -p err -b --no-pager
+Sep 03 22:10:06 kunal-devops sudo[19491]: pam_unix(sudo:session): session closed for user root
+Sep 03 22:10:06 kunal-devops sudo[19497]: pam_unix(sudo:session): session opened for user root(uid=0) by kunal(uid=501)
+Sep 03 22:10:06 kunal-devops sudo[19497]: kunal :  PWD=/home/kunal ; USER=root ; COMMAND=/usr/bin/journalctl -xe --no-pager
+
+
+############################################################
+#  8. Filter by time
+############################################################
+
+kunal@kunal-devops:~$ sudo journalctl --since '10 minutes ago' --no-pager | tail -n 8
+Sep 03 22:10:06 kunal-devops sudo[19491]: pam_unix(sudo:session): session opened for user root(uid=0) by kunal(uid=501)
+Sep 03 22:10:06 kunal-devops sudo[19491]: kunal :  PWD=/home/kunal ; USER=root ; COMMAND=/usr/bin/journalctl -p err -b --no-pager
+Sep 03 22:10:06 kunal-devops sudo[19491]: pam_unix(sudo:session): session closed for user root
+Sep 03 22:10:06 kunal-devops sudo[19497]: pam_unix(sudo:session): session opened for user root(uid=0) by kunal(uid=501)
+Sep 03 22:10:06 kunal-devops sudo[19497]: kunal :  PWD=/home/kunal ; USER=root ; COMMAND=/usr/bin/journalctl -xe --no-pager
+Sep 03 22:10:06 kunal-devops sudo[19497]: pam_unix(sudo:session): session closed for user root
+Sep 03 22:10:06 kunal-devops sudo[19503]: pam_unix(sudo:session): session opened for user root(uid=0) by kunal(uid=501)
+Sep 03 22:10:06 kunal-devops sudo[19503]: kunal :  PWD=/home/kunal ; USER=root ; COMMAND=/usr/bin/journalctl --since 10 minutes ago --no-pager
+
+kunal@kunal-devops:~$ sudo journalctl -u ssh --since today --no-pager | wc -l
+1
+
+
+############################################################
+#  9. Kernel messages only
+############################################################
+
+kunal@kunal-devops:~$ sudo journalctl -k --no-pager | head -n 8
+Sep 03 22:09:56 kunal-devops systemd-journald[920]: Received client request to rotate journal, rotating.
+Sep 03 22:09:56 kunal-devops systemd-journald[920]: Vacuuming done, freed 0B of archived journals from /var/log/journal/df1003417c89478b8407647c4b045f66.
+
+
+############################################################
+#  10. Structured output and housekeeping
+############################################################
+
+kunal@kunal-devops:~$ sudo journalctl -u ssh -o json-pretty --no-pager -n 1 | head -n 20
+
+kunal@kunal-devops:~$ sudo journalctl -o short-precise -n 3 --no-pager
+Sep 03 22:10:06.067053 kunal-devops sudo[19521]: pam_unix(sudo:session): session closed for user root
+Sep 03 22:10:06.071963 kunal-devops sudo[19527]: pam_unix(sudo:session): session opened for user root(uid=0) by kunal(uid=501)
+Sep 03 22:10:06.071993 kunal-devops sudo[19527]: kunal :  PWD=/home/kunal ; USER=root ; COMMAND=/usr/bin/journalctl -o short-precise -n 3 --no-pager
+
+kunal@kunal-devops:~$ sudo journalctl --vacuum-time=30d 2>&1 | tail -n 3
+Vacuuming done, freed 0B of archived journals from /run/log/journal.
+Vacuuming done, freed 0B of archived journals from /var/log/journal.
+Vacuuming done, freed 0B of archived journals from /var/log/journal/df1003417c89478b8407647c4b045f66.
+
+Live follow (never exits, so not captured here):  sudo journalctl -f -u ssh
