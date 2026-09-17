@@ -152,6 +152,10 @@ and acted on a difference it cared about.
 
 ## 5. Lab environment used for sections 09–11
 
+The whole setup is scripted in [`logs/cluster-up.sh`](../logs/cluster-up.sh) (kind, two
+nodes, ingress controller installed, ports 80/443 mapped to localhost) if you would
+rather not do it by hand. The manual minikube path:
+
 ```bash
 # on the Ubuntu 26.04 VM (kunal@kunal-devops), Docker already installed
 curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-arm64

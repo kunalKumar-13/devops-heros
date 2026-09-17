@@ -1,19 +1,59 @@
 #!/usr/bin/env bash
 #
-# Runs every Kubernetes exercise in sections 08-11 against a live minikube
-# cluster and writes the transcript to logs/k8s1.txt .. logs/k8s4.txt, in the
-# same banner style as the section 01-07 logs in this directory.
+# Runs every Kubernetes exercise in sections 08-11 against a live cluster and
+# writes the transcript to logs/k8s1.txt .. logs/k8s4.txt, in the same banner
+# style as the section 01-07 logs in this directory.
 #
 #   cd <repo root>
+#   ./logs/cluster-up.sh             # only if you do not have a cluster yet
 #   ./logs/capture-k8s.sh            # everything
 #   ./logs/capture-k8s.sh 3          # just section 10 (services)
 #
-# Prerequisites on the VM: minikube + kubectl (see 08-kubernetes-fundamentals),
-# and `minikube start --driver=docker` already run.
+# Works with minikube, kind or k3s - the flavour is detected below and the three
+# commands that differ between them are wrapped in functions.
 #
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 LOGS="logs"
+
+# ---------------------------------------------------------------------------
+# Which cluster flavour is this? minikube, kind and k3s differ in exactly three
+# places - how you reach a node, how you reach a NodePort, and how the ingress
+# controller gets installed - so detect once and branch here rather than in
+# every command below.
+# ---------------------------------------------------------------------------
+FLAVOUR=unknown
+if kubectl config current-context 2>/dev/null | grep -q '^minikube$'; then
+  FLAVOUR=minikube
+elif kubectl config current-context 2>/dev/null | grep -q '^kind-'; then
+  FLAVOUR=kind
+elif kubectl get nodes -o jsonpath='{.items[0].status.nodeInfo.kubeletVersion}' 2>/dev/null | grep -qi k3s; then
+  FLAVOUR=k3s
+fi
+
+node_ip() {
+  case "$FLAVOUR" in
+    minikube) minikube ip ;;
+    kind)     echo 127.0.0.1 ;;   # kind-cluster.yaml maps 80/443 to localhost
+    *)        kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' ;;
+  esac
+}
+
+nodeport_url() { # <service> <nodeport>
+  case "$FLAVOUR" in
+    minikube) minikube service "$1" --url ;;
+    *)        echo "http://$(node_ip):$2" ;;
+  esac
+}
+
+ingress_install() {
+  case "$FLAVOUR" in
+    minikube) minikube addons enable ingress ;;
+    kind)     kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml ;;
+    k3s)      echo "k3s ships Traefik as its ingress controller - already running in kube-system" ;;
+    *)        kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml ;;
+  esac
+}
 
 banner() {
   printf '\n############################################################\n'
@@ -38,6 +78,7 @@ runsh() {
 # ---------------------------------------------------------------- section 08
 section08() {
   banner "08.1  cluster is up, and the control plane runs as pods"
+  runsh "echo cluster flavour detected: $FLAVOUR"
   run kubectl cluster-info
   run kubectl get nodes -o wide
   run kubectl version --short
@@ -160,13 +201,13 @@ section10() {
   banner "10.3  NodePort - reachable on the node IP"
   run kubectl apply -f $M/02-nodeport/service.yaml
   run kubectl get svc web-nodeport
-  runsh "curl -s http://$(minikube ip):30080/ | head -12"
-  runsh "minikube service web-nodeport --url"
+  runsh "curl -s $(nodeport_url web-nodeport 30080)/ | head -12"
+  runsh "echo NodePort URL: $(nodeport_url web-nodeport 30080)"
 
   banner "10.4  LoadBalancer - EXTERNAL-IP pending without a cloud controller"
   run kubectl apply -f $M/03-loadbalancer/service.yaml
   runsh "sleep 10; kubectl get svc web-lb"
-  runsh "echo 'EXTERNAL-IP stays <pending> on minikube - see the README; minikube tunnel fakes one'"
+  runsh "echo EXTERNAL-IP stays pending without a cloud controller - see the README"
 
   banner "10.5  ExternalName - a DNS CNAME, no endpoints at all"
   run kubectl apply -f $M/04-externalname/service.yaml
@@ -192,8 +233,8 @@ section11() {
   local M=11-kubernetes-ingress-configmaps-secrets
 
   banner "11.1  the ingress controller (the Ingress object needs it to do anything)"
-  run minikube addons enable ingress
-  runsh "kubectl -n ingress-nginx rollout status deploy/ingress-nginx-controller --timeout=240s"
+  runsh "ingress_install"
+  runsh "kubectl -n ingress-nginx rollout status deploy/ingress-nginx-controller --timeout=300s || kubectl -n kube-system get pods -l app.kubernetes.io/name=traefik"
   run kubectl -n ingress-nginx get pods,svc
   run kubectl get ingressclass
 
@@ -216,7 +257,7 @@ section11() {
   runsh "kubectl apply -f $M/03-ingress/path-based.yaml"
   runsh "sleep 15; kubectl get ingress path-based"
   runsh "kubectl describe ingress path-based | sed -n '1,25p'"
-  runsh "IP=\$(minikube ip); grep -q kunal-devops.local /etc/hosts || echo \"\$IP kunal-devops.local api.kunal-devops.local shop.kunal-devops.local\" | sudo tee -a /etc/hosts"
+  runsh "IP=$(node_ip); grep -q kunal-devops.local /etc/hosts || echo \"$IP kunal-devops.local api.kunal-devops.local shop.kunal-devops.local\" | sudo tee -a /etc/hosts"
   runsh "curl -s http://kunal-devops.local/api/;  echo"
   runsh "curl -s http://kunal-devops.local/shop/; echo"
   runsh "curl -s http://kunal-devops.local/;      echo"

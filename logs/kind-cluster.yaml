@@ -1,0 +1,26 @@
+# kind cluster used by cluster-up.sh.
+#
+# Two things this config buys us:
+#   * extraPortMappings 80/443 - the ingress controller becomes reachable on
+#     localhost, so section 11 can curl real URLs instead of port-forwarding.
+#   * a second worker node - so the DaemonSet in section 09 has more than one
+#     node to appear on, which is the whole point of a DaemonSet.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: devops
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP
+  - role: worker
