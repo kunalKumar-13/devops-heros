@@ -1,0 +1,22 @@
+# The single backend every service type in this folder points at. `echoserver`
+# prints the pod name in its response, which is how you prove a Service is
+# actually load-balancing across pods and not pinning you to one.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: echo
+          image: registry.k8s.io/echoserver:1.10
+          ports:
+            - containerPort: 8080

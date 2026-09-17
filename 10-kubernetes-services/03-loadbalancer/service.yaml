@@ -1,0 +1,15 @@
+# LoadBalancer: NodePort plus a request to the cloud provider for an external L4
+# load balancer. On a bare minikube EXTERNAL-IP stays <pending> forever, because
+# there is no cloud controller to answer -- `minikube tunnel` fakes one.
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-lb
+spec:
+  type: LoadBalancer
+  selector:
+    app: web
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080

@@ -1,0 +1,11 @@
+# ExternalName has no selector, no endpoints and no proxying at all. It is purely
+# a DNS CNAME: anything in the cluster resolving `external-db` gets sent to
+# example.com instead. Used to give an out-of-cluster dependency an in-cluster
+# name, so the app config never has to change.
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-db
+spec:
+  type: ExternalName
+  externalName: example.com

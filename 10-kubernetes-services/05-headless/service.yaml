@@ -1,0 +1,16 @@
+# Headless: clusterIP None. No virtual IP and no kube-proxy rules -- a DNS query
+# for the service name returns the A records of ALL ready pods, so the client
+# picks. This is how StatefulSet members address each other individually
+# (web-0.web-headless, web-1.web-headless, ...).
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-headless
+spec:
+  clusterIP: None
+  selector:
+    app: web
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
