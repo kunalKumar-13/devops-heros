@@ -7,10 +7,14 @@ Manifests: [`01-configmap/`](01-configmap/) · [`02-secret/`](02-secret/) ·
 [`03-ingress/`](03-ingress/) · [`04-full-demo/`](04-full-demo/) (one script that wires
 all three together).
 
-> **Evidence note** — manifests and commands are complete and ready to apply on the
-> minikube setup from [section 08](../08-kubernetes-fundamentals/). Captured terminal
-> output for the Kubernetes sections is not in this branch; sections 01–07 are the ones
-> with screenshots.
+> **Evidence note** — sections 01–07 carry captured terminal output and screenshots
+> from a live Ubuntu VM. These Kubernetes sections do **not** yet: the write-up and
+> the manifests are complete and applied-tested for schema, but no cluster run is
+> recorded here, and nothing below is presented as captured output. To produce that
+> evidence, bring up the cluster from
+> [section 08 §5](../08-kubernetes-fundamentals/#5-lab-environment-used-for-sections-0911)
+> and run [`logs/capture-k8s.sh`](../logs/capture-k8s.sh) `4` — it runs every command
+> in this section and writes the transcript to `logs/k8s4.txt`.
 
 ---
 

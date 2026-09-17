@@ -4,9 +4,11 @@ Assignment: read the [Kubernetes architecture docs](https://kubernetes.io/docs/c
 and write up what a cluster is actually made of.
 
 > **Evidence note** — this section is a written assignment, so there is nothing to
-> capture. Sections 09–11 ship working manifests and the exact commands to apply
-> them; the captured terminal output for the Kubernetes sections is not in this
-> branch (sections 01–07 are the ones with screenshots).
+> capture beyond the cluster coming up. Sections 01–07 of this branch carry captured
+> terminal output and screenshots from a live Ubuntu VM; the Kubernetes sections do not
+> yet, and nothing in them is presented as captured output. Bring up the cluster with
+> [§5](#5-lab-environment-used-for-sections-0911) below and run
+> [`logs/capture-k8s.sh`](../logs/capture-k8s.sh) `1` to record it into `logs/k8s1.txt`.
 
 ---
 

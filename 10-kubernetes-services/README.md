@@ -6,10 +6,14 @@ Headless — plus how in-cluster DNS resolves them.
 One shared backend ([`00-backend-deployment.yaml`](00-backend-deployment.yaml), 3 pods of
 `echoserver`, which prints the pod name it answered from) sits behind all five.
 
-> **Evidence note** — manifests and commands are complete and ready to apply on the
-> minikube setup from [section 08](../08-kubernetes-fundamentals/#5-lab-environment-used-for-sections-0911).
-> Captured terminal output for the Kubernetes sections is not in this branch; sections
-> 01–07 are the ones with screenshots.
+> **Evidence note** — sections 01–07 carry captured terminal output and screenshots
+> from a live Ubuntu VM. These Kubernetes sections do **not** yet: the write-up and
+> the manifests are complete and applied-tested for schema, but no cluster run is
+> recorded here, and nothing below is presented as captured output. To produce that
+> evidence, bring up the cluster from
+> [section 08 §5](../08-kubernetes-fundamentals/#5-lab-environment-used-for-sections-0911)
+> and run [`logs/capture-k8s.sh`](../logs/capture-k8s.sh) `3` — it runs every command
+> in this section and writes the transcript to `logs/k8s3.txt`.
 
 ---
 
