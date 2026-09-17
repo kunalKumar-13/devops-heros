@@ -1,0 +1,14 @@
+# CrashLoopBackOff is not a phase - it is a container state surfacing in
+# kubectl get pods. The process keeps exiting, the kubelet keeps restarting it,
+# and the delay doubles: 10s, 20s, 40s ... capped at 5 minutes.
+# Read the PREVIOUS logs to debug it: kubectl logs <pod> --previous
+apiVersion: v1
+kind: Pod
+metadata:
+  name: lifecycle-crashloop
+spec:
+  restartPolicy: Always
+  containers:
+    - name: app
+      image: busybox:1.36
+      command: ["sh", "-c", "echo starting; sleep 2; echo dying; exit 1"]

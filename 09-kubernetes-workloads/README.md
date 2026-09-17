@@ -6,10 +6,14 @@ All five manifests are in [`manifests/`](manifests/) and the four deployment str
 in [`rollout-strategies/`](rollout-strategies/). Every file is commented with *why* each
 field is there, not just what it is.
 
-> **Evidence note** — the manifests and commands below are complete and ready to apply
-> on the minikube setup from [section 08](../08-kubernetes-fundamentals/#5-lab-environment-used-for-sections-0911).
-> Captured terminal output for the Kubernetes sections is not in this branch; sections
-> 01–07 are the ones with screenshots.
+> **Evidence note** — sections 01–07 carry captured terminal output and screenshots
+> from a live Ubuntu VM. These Kubernetes sections do **not** yet: the write-up and
+> the manifests are complete and applied-tested for schema, but no cluster run is
+> recorded here, and nothing below is presented as captured output. To produce that
+> evidence, bring up the cluster from
+> [section 08 §5](../08-kubernetes-fundamentals/#5-lab-environment-used-for-sections-0911)
+> and run [`logs/capture-k8s.sh`](../logs/capture-k8s.sh) `2` — it runs every command
+> in this section and writes the transcript to `logs/k8s2.txt`.
 
 ---
 
@@ -221,7 +225,77 @@ independent of pod count you use ingress-level weighting
 
 ---
 
-## 7. Cheat sheet
+## 7. Pod lifecycle — [`pod-lifecycle/`](pod-lifecycle/)
+
+Nine manifests, each reproducing one state on purpose so the failure is recognisable
+when it happens for real.
+
+| File | Produces | The giveaway in `kubectl` |
+|---|---|---|
+| [`01-pending.yaml`](pod-lifecycle/01-pending.yaml) | `Pending` forever (500Gi request) | `describe` → `FailedScheduling: Insufficient memory` |
+| [`02-succeeded.yaml`](pod-lifecycle/02-succeeded.yaml) | `Succeeded` | exit 0 with `restartPolicy: Never` |
+| [`03-failed.yaml`](pod-lifecycle/03-failed.yaml) | `Failed` / `Error` | non-zero exit code in the container status |
+| [`04-crashloopbackoff.yaml`](pod-lifecycle/04-crashloopbackoff.yaml) | `CrashLoopBackOff` | rising `RESTARTS`; read `logs --previous` |
+| [`05-imagepullbackoff.yaml`](pod-lifecycle/05-imagepullbackoff.yaml) | `ImagePullBackOff` | no logs at all — only `describe` events |
+| [`06-probes.yaml`](pod-lifecycle/06-probes.yaml) | startup + readiness + liveness together | `0/1 Running` vs restarts |
+| [`07-init-container.yaml`](pod-lifecycle/07-init-container.yaml) | `Init:0/1` then `Running` | init runs to completion first |
+| [`08-multi-container.yaml`](pod-lifecycle/08-multi-container.yaml) | sidecar sharing an `emptyDir` | `2/2 READY`, `-c` to pick a container |
+| [`09-termination.yaml`](pod-lifecycle/09-termination.yaml) | graceful shutdown | `preStop` runs before SIGTERM |
+
+The distinction worth carrying away: **`Pending` is a scheduler problem** (no node fits
+— resources, taints, affinity, unbound PVC), while **`CrashLoopBackOff` and
+`ImagePullBackOff` are kubelet problems** (the node was chosen fine; starting the
+container failed). They are diagnosed in completely different places — `describe` events
+for the former, container logs and `--previous` for the latter.
+
+And the probe pair that causes real outages: a **readiness** failure removes the pod from
+Service endpoints but leaves it running; a **liveness** failure *kills* it. Point a
+liveness probe at a downstream dependency and an incident in that dependency will restart
+every one of your healthy pods.
+
+```bash
+kubectl apply -f pod-lifecycle/
+kubectl get pods                            # all nine states side by side
+kubectl describe pod lifecycle-pending      | grep -A3 Events:
+kubectl logs lifecycle-crashloop --previous
+kubectl exec lifecycle-sidecar -c server -- curl -s localhost
+kubectl delete -f pod-lifecycle/
+```
+
+---
+
+## 8. Troubleshooting — [`troubleshooting/`](troubleshooting/)
+
+Three manifests that are **broken on purpose**, because the useful skill is recognising
+the symptom:
+
+* [`01-selector-mismatch.yaml`](troubleshooting/01-selector-mismatch.yaml) — Service
+  selector `app: web`, pods labelled `app: web-v2`. The Service exists and has a
+  ClusterIP; it just has **no endpoints**, and nothing in `kubectl get svc` says so.
+* [`02-wrong-targetport.yaml`](troubleshooting/02-wrong-targetport.yaml) — labels match,
+  endpoints exist, everything *looks* healthy, but `targetPort: 8080` is not the port
+  nginx listens on. Connections hang or are refused at the pod.
+* [`03-readiness-never-passes.yaml`](troubleshooting/03-readiness-never-passes.yaml) —
+  readiness probe hits `/healthz`, which nginx answers with 404. Pods sit at `0/1
+  Running`, the Service has no endpoints, and a rolling update **stalls** rather than
+  failing loudly.
+
+```bash
+kubectl apply -f troubleshooting/
+kubectl get endpointslice -l kubernetes.io/service-name=broken-svc   # empty
+kubectl describe svc broken-svc | grep -i selector
+kubectl get pods --show-labels                                       # compare
+kubectl describe pod -l app=never-ready | grep -i -A2 "readiness probe failed"
+kubectl delete -f troubleshooting/
+```
+
+First three things to check, in this order, whenever a Service "does not work":
+**endpoints → labels vs selector → readiness**. That covers the overwhelming majority of
+cases before anything cluster-level is worth looking at.
+
+---
+
+## 9. Cheat sheet
 
 ```bash
 kubectl get all                                  # everything in the namespace

@@ -1,0 +1,14 @@
+# Phase: Pending, forever. The resource request is larger than any node can
+# satisfy, so the scheduler filters every node out and never binds the pod.
+# kubectl describe shows: FailedScheduling / Insufficient memory.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: lifecycle-pending
+spec:
+  containers:
+    - name: app
+      image: nginx:1.27-alpine
+      resources:
+        requests:
+          memory: "500Gi"

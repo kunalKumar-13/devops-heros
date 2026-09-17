@@ -1,0 +1,38 @@
+# BROKEN ON PURPOSE. Labels match and endpoints exist, so everything LOOKS
+# healthy - but targetPort 8080 is not the port nginx listens on (80), so every
+# request times out or is refused at the pod.
+#
+# Diagnose: endpoints are present, yet curl fails. Compare the Service
+# targetPort with the containerPort, then curl the pod IP directly:
+#   kubectl get pod -o wide
+#   kubectl exec client -- curl -sv http://<pod-ip>:80
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wrong-port
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wrong-port
+  template:
+    metadata:
+      labels:
+        app: wrong-port
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wrong-port-svc
+spec:
+  selector:
+    app: wrong-port
+  ports:
+    - port: 80
+      targetPort: 8080   # <-- nginx does not listen here

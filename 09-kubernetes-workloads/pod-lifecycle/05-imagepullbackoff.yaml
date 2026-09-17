@@ -1,0 +1,11 @@
+# ImagePullBackOff: the image name or tag does not exist (or the registry needs
+# credentials the pod does not have). The pod never starts, so there are no
+# container logs at all - the evidence is only in kubectl describe events.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: lifecycle-imagepull
+spec:
+  containers:
+    - name: app
+      image: nginx:this-tag-does-not-exist
