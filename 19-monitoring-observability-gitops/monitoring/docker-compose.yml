@@ -21,7 +21,8 @@ services:
     image: grafana/grafana:12.1.1
     ports: ["3000:3000"]
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: kunal-demo        # local demo only
+      # never hard-coded: the lab generates a random password for each run
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD}
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
     volumes:

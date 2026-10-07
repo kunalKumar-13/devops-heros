@@ -1,0 +1,8 @@
+# Findings that were reviewed and remediated, but remain in Git history.
+#
+# A Grafana admin password for a throwaway local demo container was written
+# inline in the Session 20 monitoring lab. The Session 17 secret-scanning job
+# caught it on its first run. The script now generates a random password per
+# run and passes it through the environment; the value was never used on any
+# real system, so the old commit is acknowledged here rather than rewritten.
+df0935713336bbfca581d76683f6f4a7433b57b2:19-monitoring-observability-gitops/monitoring-lab.sh:curl-auth-user:36
