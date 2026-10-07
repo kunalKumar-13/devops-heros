@@ -1,0 +1,5 @@
+# Copy to terraform.tfvars to override the defaults. Never put credentials here.
+aws_region        = "ap-south-1"
+project           = "kunal-devops"
+environment       = "dev"
+enable_versioning = true
