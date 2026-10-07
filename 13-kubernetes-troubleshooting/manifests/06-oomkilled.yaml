@@ -1,0 +1,13 @@
+# BROKEN: allocates more memory than its 32Mi limit, so the kernel kills it.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: oomkilled
+spec:
+  restartPolicy: Never
+  containers:
+    - name: app
+      image: python:3.12-alpine
+      command: ["python", "-c", "x = bytearray(200 * 1024 * 1024); print('allocated')"]
+      resources:
+        limits: { memory: 32Mi }

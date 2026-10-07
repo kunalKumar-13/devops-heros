@@ -1,0 +1,11 @@
+# BROKEN: asks for more CPU than any node has, so the scheduler cannot place it.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pending
+spec:
+  containers:
+    - name: app
+      image: nginx:1.27-alpine
+      resources:
+        requests: { cpu: "64" }

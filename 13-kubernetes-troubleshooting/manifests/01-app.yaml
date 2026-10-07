@@ -1,0 +1,25 @@
+# The healthy baseline: an nginx Deployment behind a Service.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: troubleshooting-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: troubleshooting-app }
+  template:
+    metadata:
+      labels: { app: troubleshooting-app }
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports: [{ containerPort: 80 }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: troubleshooting-service
+spec:
+  selector: { app: troubleshooting-app }
+  ports: [{ port: 80, targetPort: 80 }]
