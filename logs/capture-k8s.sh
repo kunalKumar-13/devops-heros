@@ -49,7 +49,14 @@ nodeport_url() { # <service> <nodeport>
 ingress_install() {
   case "$FLAVOUR" in
     minikube) minikube addons enable ingress ;;
-    kind)     kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml ;;
+    kind)
+      # pinned release, and pinned to the node kind exposes on port 80: the
+      # upstream manifest selects on OS only, so the controller could land on
+      # a worker where nothing is mapped and every request gets a TCP reset
+      kubectl label node "$(kubectl get nodes -o name | grep control-plane | head -1 | cut -d/ -f2)" ingress-ready=true --overwrite
+      kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/kind/deploy.yaml
+      kubectl -n ingress-nginx patch deployment ingress-nginx-controller --type merge \
+        -p '{"spec":{"template":{"spec":{"nodeSelector":{"ingress-ready":"true","kubernetes.io/os":"linux"}}}}}' ;;
     k3s)      echo "k3s ships Traefik as its ingress controller - already running in kube-system" ;;
     *)        kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml ;;
   esac
@@ -233,7 +240,7 @@ section11() {
   local M=11-kubernetes-ingress-configmaps-secrets
 
   banner "11.1  the ingress controller (the Ingress object needs it to do anything)"
-  runsh "ingress_install"
+  run ingress_install
   runsh "kubectl -n ingress-nginx rollout status deploy/ingress-nginx-controller --timeout=300s || kubectl -n kube-system get pods -l app.kubernetes.io/name=traefik"
   run kubectl -n ingress-nginx get pods,svc
   run kubectl get ingressclass

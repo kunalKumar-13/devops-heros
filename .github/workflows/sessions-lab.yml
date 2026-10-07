@@ -1,0 +1,175 @@
+# Runs the hands-on part of every session that needs a cluster, a cloud API or
+# a monitoring stack, and saves each transcript (and screenshots) as evidence.
+#
+#   kubernetes   sessions 9-12 (logs/capture-k8s.sh), 13, 14 and 15, on kind
+#   terraform    sessions 18 and 19, applied against Moto (an AWS API emulator)
+#   monitoring   session 20 part 1: Prometheus + Grafana with Docker Compose
+#   gitops       session 20 part 2: Argo CD syncing from this repository
+
+name: "Sessions 9-20: labs"
+
+on:
+  push:
+    branches: [assignment]
+    paths:
+      - "08-kubernetes-fundamentals/**"
+      - "09-kubernetes-workloads/**"
+      - "10-kubernetes-services/**"
+      - "11-kubernetes-ingress-configmaps-secrets/**"
+      - "12-kubernetes-storage-hpa-probes/**"
+      - "13-kubernetes-troubleshooting/**"
+      - "14-helm/**"
+      - "17-terraform-iac/**"
+      - "18-cloud-terraform/**"
+      - "19-monitoring-observability-gitops/**"
+      - "labs/**"
+      - "logs/*.sh"
+      - "logs/*.yaml"
+      - ".github/workflows/sessions-lab.yml"
+  workflow_dispatch:
+
+jobs:
+  kubernetes:
+    name: Kubernetes labs (sessions 9-15)
+    runs-on: ubuntu-latest
+    env:
+      PROMPT_HOST: kind-lab
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: helm/kind-action@v1
+        with:
+          cluster_name: devops
+          config: logs/kind-cluster.yaml
+          wait: 120s
+
+      - name: Metrics Server (for the HPA)
+        run: |
+          kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.8.0/components.yaml
+          kubectl -n kube-system patch deployment metrics-server --type json \
+            -p '[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+          kubectl -n kube-system rollout status deployment/metrics-server --timeout=180s
+
+      - name: Sessions 9-12 (logs/capture-k8s.sh)
+        run: |
+          echo "127.0.0.1 kunal-devops.local api.kunal-devops.local shop.kunal-devops.local" | sudo tee -a /etc/hosts
+          bash logs/capture-k8s.sh all
+          mkdir -p evidence && cp logs/k8s*.txt evidence/
+
+      - name: Session 13 - storage, HPA, probes
+        run: bash 12-kubernetes-storage-hpa-probes/lab.sh 2>&1 | tee evidence/session13.txt
+
+      - name: Session 14 - troubleshooting
+        run: bash 13-kubernetes-troubleshooting/lab.sh 2>&1 | tee evidence/session14.txt
+
+      - name: Session 15 - Helm
+        run: bash 14-helm/lab.sh 2>&1 | tee evidence/session15.txt
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: kubernetes-transcripts
+          path: evidence/
+
+  terraform:
+    name: Terraform labs (sessions 18-19)
+    runs-on: ubuntu-latest
+    env:
+      PROMPT_HOST: terraform-lab
+      AWS_ENDPOINT: http://localhost:5000
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.10.3"
+          terraform_wrapper: false
+      - name: Start Moto (AWS API emulator)
+        run: |
+          pip install -q "moto[server]==5.2.3"
+          nohup moto_server -p 5000 > moto.log 2>&1 &
+          for i in $(seq 1 20); do curl -s localhost:5000 >/dev/null && break; sleep 1; done
+          aws --version
+      - name: Session 18 - Terraform lifecycle on S3
+        run: |
+          mkdir -p evidence
+          bash 17-terraform-iac/lab.sh 2>&1 | tee evidence/session18.txt
+      - name: Session 19 - VPC on AWS with Terraform
+        run: bash 18-cloud-terraform/lab.sh 2>&1 | tee evidence/session19.txt
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: terraform-transcripts
+          path: evidence/
+
+  monitoring:
+    name: Monitoring lab (session 20, part 1)
+    runs-on: ubuntu-latest
+    env:
+      PROMPT_HOST: monitoring-lab
+    steps:
+      - uses: actions/checkout@v7
+      - name: Prometheus + Grafana
+        run: |
+          mkdir -p evidence
+          bash 19-monitoring-observability-gitops/monitoring-lab.sh 2>&1 | tee evidence/session20-monitoring.txt
+      - uses: actions/setup-node@v7
+        with: { node-version: "22" }
+      - name: Screenshots
+        working-directory: labs
+        env:
+          SHOT_AUTH: admin:kunal-demo
+        run: |
+          npm init -y >/dev/null && npm install --no-save --no-audit --no-fund playwright@1.63.0
+          npx playwright install --with-deps chromium
+          node screenshot.mjs ../evidence \
+            "prometheus-targets=http://localhost:9090/targets" \
+            "grafana-dashboard=http://localhost:3000/d/session20/session-20-monitoring?orgId=1&from=now-5m&to=now&kiosk"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: monitoring-evidence
+          path: evidence/
+
+  gitops:
+    name: GitOps lab (session 20, part 2)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write          # the lab pushes a real commit to a short-lived branch
+    env:
+      PROMPT_HOST: gitops-lab
+      GITOPS_BRANCH: gitops-demo-${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Create the branch Argo CD will follow
+        run: |
+          git push origin HEAD:refs/heads/$GITOPS_BRANCH
+          echo "Argo CD will follow $GITOPS_BRANCH"
+      - uses: helm/kind-action@v1
+        with: { cluster_name: gitops }
+      - name: Argo CD sync, Git change, self-healing
+        run: |
+          mkdir -p evidence
+          bash 19-monitoring-observability-gitops/gitops-lab.sh 2>&1 | tee evidence/session20-gitops.txt
+      - uses: actions/setup-node@v7
+        with: { node-version: "22" }
+      - name: Screenshot the Argo CD UI
+        working-directory: labs
+        run: |
+          kubectl -n argocd port-forward svc/argocd-server 8443:443 >/dev/null 2>&1 &
+          sleep 5
+          pass=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)
+          token=$(curl -sk https://localhost:8443/api/v1/session -H 'Content-Type: application/json' \
+                    -d "{\"username\":\"admin\",\"password\":\"$pass\"}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
+          npm init -y >/dev/null && npm install --no-save --no-audit --no-fund playwright@1.63.0
+          npx playwright install --with-deps chromium
+          SHOT_COOKIE="argocd.token=$token" node screenshot.mjs ../evidence \
+            "argocd-app=https://localhost:8443/applications/argocd/session20-mini?view=tree" \
+            "argocd-list=https://localhost:8443/applications"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: gitops-evidence
+          path: evidence/
+      - name: Delete the short-lived branch
+        if: always()
+        run: git push origin --delete $GITOPS_BRANCH || true

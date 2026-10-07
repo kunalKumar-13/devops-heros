@@ -23,4 +23,8 @@ nodes:
       - containerPort: 443
         hostPort: 443
         protocol: TCP
+      # the session 11 NodePort service, so it is reachable from the host
+      - containerPort: 30080
+        hostPort: 30080
+        protocol: TCP
   - role: worker
