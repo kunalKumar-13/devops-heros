@@ -70,14 +70,14 @@ banner() {
 
 # run a command, echoing it with a prompt first, exactly as it appeared
 run() {
-  printf '%s@%s:~/devops-heros$ %s\n' "${USER:-kunal}" "$(hostname)" "$*"
+  printf '%s@%s:~/devops-heros$ %s\n' "${PROMPT_USER:-${USER:-kunal}}" "${PROMPT_HOST:-$(hostname)}" "$*"
   "$@" 2>&1
   printf '\n'
 }
 
 # same, but for a pipeline / shell one-liner passed as a single string
 runsh() {
-  printf '%s@%s:~/devops-heros$ %s\n' "${USER:-kunal}" "$(hostname)" "$1"
+  printf '%s@%s:~/devops-heros$ %s\n' "${PROMPT_USER:-${USER:-kunal}}" "${PROMPT_HOST:-$(hostname)}" "$1"
   bash -c "$1" 2>&1
   printf '\n'
 }
@@ -88,7 +88,7 @@ section08() {
   runsh "echo cluster flavour detected: $FLAVOUR"
   run kubectl cluster-info
   run kubectl get nodes -o wide
-  run kubectl version --short
+  run kubectl version
   run kubectl get pods -n kube-system -o wide
 
   banner "08.2  every kind this cluster knows about"
@@ -196,7 +196,7 @@ section10() {
   run kubectl apply -f $M/01-clusterip/service.yaml
   run kubectl get svc web-clusterip
   run kubectl get endpointslice -l kubernetes.io/service-name=web-clusterip -o wide
-  runsh "for i in 1 2 3 4 5 6; do kubectl exec client -- curl -s http://web-clusterip/ | grep -i '^Hostname'; done"
+  runsh "for i in 1 2 3 4 5 6; do kubectl exec client -- curl -s -m 10 http://web-clusterip/ | grep -i '^Hostname'; done"
 
   banner "10.2  ClusterIP with zero endpoints - the commonest failure"
   run kubectl scale deploy/web --replicas=0
@@ -264,23 +264,23 @@ section11() {
   runsh "kubectl apply -f $M/03-ingress/path-based.yaml"
   runsh "sleep 15; kubectl get ingress path-based"
   runsh "kubectl describe ingress path-based | sed -n '1,25p'"
-  runsh "IP=$(node_ip); grep -q kunal-devops.local /etc/hosts || echo \"$IP kunal-devops.local api.kunal-devops.local shop.kunal-devops.local\" | sudo tee -a /etc/hosts"
-  runsh "curl -s http://kunal-devops.local/api/;  echo"
-  runsh "curl -s http://kunal-devops.local/shop/; echo"
-  runsh "curl -s http://kunal-devops.local/;      echo"
+  runsh "grep -q kunal-devops.local /etc/hosts || echo \"$(node_ip) kunal-devops.local api.kunal-devops.local shop.kunal-devops.local\" | sudo tee -a /etc/hosts"
+  runsh "curl -s -m 10 http://kunal-devops.local/api/;  echo"
+  runsh "curl -s -m 10 http://kunal-devops.local/shop/; echo"
+  runsh "curl -s -m 10 http://kunal-devops.local/;      echo"
 
   banner "11.5  host-based Ingress - same cluster, routed on the Host header"
   runsh "kubectl apply -f $M/03-ingress/host-based.yaml"
   runsh "sleep 10; kubectl get ingress host-based"
-  runsh "curl -s http://api.kunal-devops.local/;  echo"
-  runsh "curl -s http://shop.kunal-devops.local/; echo"
+  runsh "curl -s -m 10 http://api.kunal-devops.local/;  echo"
+  runsh "curl -s -m 10 http://shop.kunal-devops.local/; echo"
 
   banner "11.6  config and secret values, read from inside the running pod"
   runsh "POD=\$(kubectl get pod -l app=api -o jsonpath='{.items[0].metadata.name}'); kubectl exec \$POD -- sh -c 'echo APP_ENV=\$APP_ENV; echo LOG_LEVEL=\$LOG_LEVEL; echo DB_PASSWORD=\$DB_PASSWORD'"
 
   banner "11.7  a 404 and a 503, on purpose - what each one means"
-  runsh "curl -s -o /dev/null -w 'no matching rule -> HTTP %{http_code}\n' http://kunal-devops.local/nope/"
-  runsh "kubectl scale deploy/shop --replicas=0; sleep 12; curl -s -o /dev/null -w 'rule matched, no endpoints -> HTTP %{http_code}\n' http://kunal-devops.local/shop/"
+  runsh "curl -s -m 10 -o /dev/null -w 'no matching rule -> HTTP %{http_code}\n' http://kunal-devops.local/nope/"
+  runsh "kubectl scale deploy/shop --replicas=0; sleep 12; curl -s -m 10 -o /dev/null -w 'rule matched, no endpoints -> HTTP %{http_code}\n' http://kunal-devops.local/shop/"
   runsh "kubectl scale deploy/shop --replicas=1; kubectl rollout status deploy/shop --timeout=180s"
 
   banner "11.8  cleanup"

@@ -45,6 +45,7 @@ jobs:
     name: Kubernetes labs (sessions 9-15)
     runs-on: ubuntu-latest
     env:
+      PROMPT_USER: kunal
       PROMPT_HOST: kind-lab
     steps:
       - uses: actions/checkout@v7
