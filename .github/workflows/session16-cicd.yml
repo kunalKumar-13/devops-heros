@@ -1,0 +1,116 @@
+# Session 16: the final CI/CD pipeline for the calculator app in
+# 15-github-actions/. It shows every idea from the session in one workflow:
+#
+#   triggers      push, pull request, manual dispatch, a weekly schedule
+#   jobs          test (a matrix), then build and security-check in parallel
+#   runners       Ubuntu and Windows, three Python versions
+#   secrets       a repository secret, masked in the logs
+#   artifacts     the build is uploaded, then downloaded by a later job
+#   conditionals  the release step only runs on a push to the assignment branch
+
+name: "Session 16: CI/CD"
+
+on:
+  push:
+    branches: [assignment]
+    paths: ["15-github-actions/**", ".github/workflows/session16-cicd.yml"]
+  pull_request:
+    paths: ["15-github-actions/**"]
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * 1"      # every Monday 03:00 UTC, catches dependency drift
+
+defaults:
+  run:
+    working-directory: 15-github-actions
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Runner details
+        shell: bash
+        run: |
+          echo "runner os   : $RUNNER_OS ($RUNNER_ARCH)"
+          echo "runner name : $RUNNER_NAME"
+          python --version
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run tests
+        run: pytest --cov=app --cov-report=term-missing
+
+  build:
+    name: Build
+    needs: test                         # sequential: only after every test passes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the package
+        run: ./build.sh
+      - name: Upload the build
+        uses: actions/upload-artifact@v7
+        with:
+          name: calculator-build
+          path: 15-github-actions/dist/
+          retention-days: 14
+
+  security-check:
+    name: Security check
+    needs: test                         # runs in parallel with build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: No sensitive files committed
+        run: |
+          found=$(find .. -path ../.git -prune -o -type f \( -name ".env" -o -name "*.pem" -o -name "*.key" -o -name "id_rsa" \) -print)
+          if [ -n "$found" ]; then
+            echo "sensitive files found:"; echo "$found"; exit 1
+          fi
+          echo "no .env, .pem, .key or private-key files in the repository"
+      - name: No hard-coded credentials in the app
+        run: |
+          if grep -rniE "(password|secret|api_key|token)\s*=\s*['\"][^'\"]+['\"]" app/; then
+            echo "possible hard-coded credential"; exit 1
+          fi
+          echo "no hard-coded credentials in app/"
+
+  release:
+    name: Release
+    needs: [build, security-check]
+    # conditional job: a pull request or a scheduled run tests and builds, but never releases
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download the build from the earlier job
+        uses: actions/download-artifact@v7
+        with:
+          name: calculator-build
+          path: dist
+        # downloaded into the workspace root, not the default working directory
+      - name: Show what is being released
+        working-directory: .
+        run: |
+          ls -l dist
+          cat dist/build-info.txt
+      - name: Use a repository secret
+        working-directory: .
+        env:
+          RELEASE_NOTE: ${{ secrets.RELEASE_NOTE }}
+        run: |
+          if [ -z "$RELEASE_NOTE" ]; then
+            echo "RELEASE_NOTE secret is not set"; exit 1
+          fi
+          echo "the secret is available to this step (${#RELEASE_NOTE} characters)"
+          echo "printing it directly is masked by GitHub: $RELEASE_NOTE"
