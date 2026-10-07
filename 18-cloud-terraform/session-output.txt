@@ -1,0 +1,592 @@
+
+############################################################
+#  1. init, fmt, validate
+############################################################
+
+kunal@terraform-lab:~$ terraform init -input=false -no-color
+Initializing the backend...
+Initializing provider plugins...
+- Reusing previous version of hashicorp/aws from the dependency lock file
+- Installing hashicorp/aws v5.100.0...
+- Installed hashicorp/aws v5.100.0 (signed by HashiCorp)
+Terraform has made some changes to the provider dependency selections recorded
+in the .terraform.lock.hcl file. Review those changes and commit them to your
+version control system if they represent changes you intended to make.
+
+Terraform has been successfully initialized!
+
+You may now begin working with Terraform. Try running "terraform plan" to see
+any changes that are required for your infrastructure. All Terraform commands
+should now work.
+
+If you ever set or change modules or backend configuration for Terraform,
+rerun this command to reinitialize your working directory. If you forget, other
+commands will detect it and remind you to do so if necessary.
+
+kunal@terraform-lab:~$ terraform fmt -check -diff
+
+kunal@terraform-lab:~$ terraform validate -no-color
+Success! The configuration is valid.
+
+
+
+############################################################
+#  2. plan
+############################################################
+
+kunal@terraform-lab:~$ terraform plan -input=false -no-color -out=tfplan
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+  # aws_internet_gateway.main will be created
+  + resource "aws_internet_gateway" "main" {
+      + arn      = (known after apply)
+      + id       = (known after apply)
+      + owner_id = (known after apply)
+      + tags     = {
+          + "Name" = "kunal-web-igw"
+        }
+      + tags_all = {
+          + "ManagedBy" = "terraform"
+          + "Name"      = "kunal-web-igw"
+          + "Owner"     = "kunal"
+          + "Project"   = "kunal-web"
+        }
+      + vpc_id   = (known after apply)
+    }
+
+  # aws_route_table.public will be created
+  + resource "aws_route_table" "public" {
+      + arn              = (known after apply)
+      + id               = (known after apply)
+      + owner_id         = (known after apply)
+      + propagating_vgws = (known after apply)
+      + route            = [
+          + {
+              + cidr_block                 = "0.0.0.0/0"
+              + gateway_id                 = (known after apply)
+                # (11 unchanged attributes hidden)
+            },
+        ]
+      + tags             = {
+          + "Name" = "kunal-web-public-rt"
+        }
+      + tags_all         = {
+          + "ManagedBy" = "terraform"
+          + "Name"      = "kunal-web-public-rt"
+          + "Owner"     = "kunal"
+          + "Project"   = "kunal-web"
+        }
+      + vpc_id           = (known after apply)
+    }
+
+  # aws_route_table_association.public will be created
+  + resource "aws_route_table_association" "public" {
+      + id             = (known after apply)
+      + route_table_id = (known after apply)
+      + subnet_id      = (known after apply)
+    }
+
+  # aws_security_group.web will be created
+  + resource "aws_security_group" "web" {
+      + arn                    = (known after apply)
+      + description            = "HTTP and HTTPS from anywhere, SSH from one address"
+      + egress                 = [
+          + {
+              + cidr_blocks      = [
+                  + "0.0.0.0/0",
+                ]
+              + description      = "All outbound"
+              + from_port        = 0
+              + ipv6_cidr_blocks = []
+              + prefix_list_ids  = []
+              + protocol         = "-1"
+              + security_groups  = []
+              + self             = false
+              + to_port          = 0
+            },
+        ]
+      + id                     = (known after apply)
+      + ingress                = [
+          + {
+              + cidr_blocks      = [
+                  + "0.0.0.0/0",
+                ]
+              + description      = "HTTP"
+              + from_port        = 80
+              + ipv6_cidr_blocks = []
+              + prefix_list_ids  = []
+              + protocol         = "tcp"
+              + security_groups  = []
+              + self             = false
+              + to_port          = 80
+            },
+          + {
+              + cidr_blocks      = [
+                  + "0.0.0.0/0",
+                ]
+              + description      = "HTTPS"
+              + from_port        = 443
+              + ipv6_cidr_blocks = []
+              + prefix_list_ids  = []
+              + protocol         = "tcp"
+              + security_groups  = []
+              + self             = false
+              + to_port          = 443
+            },
+          + {
+              + cidr_blocks      = [
+                  + "203.0.113.10/32",
+                ]
+              + description      = "SSH, restricted"
+              + from_port        = 22
+              + ipv6_cidr_blocks = []
+              + prefix_list_ids  = []
+              + protocol         = "tcp"
+              + security_groups  = []
+              + self             = false
+              + to_port          = 22
+            },
+        ]
+      + name                   = "kunal-web-web"
+      + name_prefix            = (known after apply)
+      + owner_id               = (known after apply)
+      + revoke_rules_on_delete = false
+      + tags                   = {
+          + "Name" = "kunal-web-web-sg"
+        }
+      + tags_all               = {
+          + "ManagedBy" = "terraform"
+          + "Name"      = "kunal-web-web-sg"
+          + "Owner"     = "kunal"
+          + "Project"   = "kunal-web"
+        }
+      + vpc_id                 = (known after apply)
+    }
+
+  # aws_subnet.public will be created
+  + resource "aws_subnet" "public" {
+      + arn                                            = (known after apply)
+      + assign_ipv6_address_on_creation                = false
+      + availability_zone                              = "ap-south-1a"
+      + availability_zone_id                           = (known after apply)
+      + cidr_block                                     = "10.20.1.0/24"
+      + enable_dns64                                   = false
+      + enable_resource_name_dns_a_record_on_launch    = false
+      + enable_resource_name_dns_aaaa_record_on_launch = false
+      + id                                             = (known after apply)
+      + ipv6_cidr_block_association_id                 = (known after apply)
+      + ipv6_native                                    = false
+      + map_public_ip_on_launch                        = true
+      + owner_id                                       = (known after apply)
+      + private_dns_hostname_type_on_launch            = (known after apply)
+      + tags                                           = {
+          + "Name" = "kunal-web-public"
+        }
+      + tags_all                                       = {
+          + "ManagedBy" = "terraform"
+          + "Name"      = "kunal-web-public"
+          + "Owner"     = "kunal"
+          + "Project"   = "kunal-web"
+        }
+      + vpc_id                                         = (known after apply)
+    }
+
+  # aws_vpc.main will be created
+  + resource "aws_vpc" "main" {
+      + arn                                  = (known after apply)
+      + cidr_block                           = "10.20.0.0/16"
+      + default_network_acl_id               = (known after apply)
+      + default_route_table_id               = (known after apply)
+      + default_security_group_id            = (known after apply)
+      + dhcp_options_id                      = (known after apply)
+      + enable_dns_hostnames                 = true
+      + enable_dns_support                   = true
+      + enable_network_address_usage_metrics = (known after apply)
+      + id                                   = (known after apply)
+      + instance_tenancy                     = "default"
+      + ipv6_association_id                  = (known after apply)
+      + ipv6_cidr_block                      = (known after apply)
+      + ipv6_cidr_block_network_border_group = (known after apply)
+      + main_route_table_id                  = (known after apply)
+      + owner_id                             = (known after apply)
+      + tags                                 = {
+          + "Name" = "kunal-web-vpc"
+        }
+      + tags_all                             = {
+          + "ManagedBy" = "terraform"
+          + "Name"      = "kunal-web-vpc"
+          + "Owner"     = "kunal"
+          + "Project"   = "kunal-web"
+        }
+    }
+
+Plan: 6 to add, 0 to change, 0 to destroy.
+
+Changes to Outputs:
+  + internet_gateway_id   = (known after apply)
+  + public_subnet_id      = (known after apply)
+  + vpc_id                = (known after apply)
+  + web_security_group_id = (known after apply)
+
+─────────────────────────────────────────────────────────────────────────────
+
+Saved the plan to: tfplan
+
+To perform exactly these actions, run the following command to apply:
+    terraform apply "tfplan"
+
+
+############################################################
+#  3. apply
+############################################################
+
+kunal@terraform-lab:~$ terraform apply -input=false -no-color tfplan
+aws_vpc.main: Creating...
+aws_vpc.main: Still creating... [10s elapsed]
+aws_vpc.main: Creation complete after 10s [id=vpc-49839e3b84a6a2207]
+aws_internet_gateway.main: Creating...
+aws_subnet.public: Creating...
+aws_security_group.web: Creating...
+aws_internet_gateway.main: Creation complete after 0s [id=igw-3c97efabe98084ffe]
+aws_route_table.public: Creating...
+aws_security_group.web: Creation complete after 0s [id=sg-1b9d1d3ec7c187e46]
+aws_route_table.public: Creation complete after 0s [id=rtb-6a1a96bee5f4bf6a9]
+aws_subnet.public: Still creating... [10s elapsed]
+aws_subnet.public: Creation complete after 10s [id=subnet-be6d56b9e624b0a0f]
+aws_route_table_association.public: Creating...
+aws_route_table_association.public: Creation complete after 0s [id=rtbassoc-85ed2bb8aa37395a2]
+
+Apply complete! Resources: 6 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+internet_gateway_id = "igw-3c97efabe98084ffe"
+public_subnet_id = "subnet-be6d56b9e624b0a0f"
+vpc_id = "vpc-49839e3b84a6a2207"
+web_security_group_id = "sg-1b9d1d3ec7c187e46"
+
+kunal@terraform-lab:~$ terraform output -no-color
+internet_gateway_id = "igw-3c97efabe98084ffe"
+public_subnet_id = "subnet-be6d56b9e624b0a0f"
+vpc_id = "vpc-49839e3b84a6a2207"
+web_security_group_id = "sg-1b9d1d3ec7c187e46"
+
+
+############################################################
+#  4. Verify each piece with the AWS CLI
+############################################################
+
+kunal@terraform-lab:~$ aws --endpoint-url http://127.0.0.1:5000 ec2 describe-vpcs --vpc-ids vpc-49839e3b84a6a2207 --query 'Vpcs[0].{Id:VpcId,Cidr:CidrBlock,State:State}' --output table
+--------------------------------------------------------
+|                     DescribeVpcs                     |
++---------------+-------------------------+------------+
+|     Cidr      |           Id            |   State    |
++---------------+-------------------------+------------+
+|  10.20.0.0/16 |  vpc-49839e3b84a6a2207  |  available |
++---------------+-------------------------+------------+
+
+kunal@terraform-lab:~$ aws --endpoint-url http://127.0.0.1:5000 ec2 describe-subnets --subnet-ids subnet-be6d56b9e624b0a0f --query 'Subnets[0].{Id:SubnetId,Cidr:CidrBlock,AZ:AvailabilityZone,PublicIPOnLaunch:MapPublicIpOnLaunch}' --output table
+--------------------------------------------------
+|                 DescribeSubnets                |
++-------------------+----------------------------+
+|  AZ               |  ap-south-1a               |
+|  Cidr             |  10.20.1.0/24              |
+|  Id               |  subnet-be6d56b9e624b0a0f  |
+|  PublicIPOnLaunch |  True                      |
++-------------------+----------------------------+
+
+kunal@terraform-lab:~$ aws --endpoint-url http://127.0.0.1:5000 ec2 describe-internet-gateways --filters Name=attachment.vpc-id,Values=vpc-49839e3b84a6a2207 --query 'InternetGateways[0].{Id:InternetGatewayId,AttachedTo:Attachments[0].VpcId,State:Attachments[0].State}' --output table
+-----------------------------------------------------------------
+|                   DescribeInternetGateways                    |
++------------------------+-------------------------+------------+
+|       AttachedTo       |           Id            |   State    |
++------------------------+-------------------------+------------+
+|  vpc-49839e3b84a6a2207 |  igw-3c97efabe98084ffe  |  available |
++------------------------+-------------------------+------------+
+
+>>> the route that makes the subnet public: 0.0.0.0/0 to the internet gateway
+
+kunal@terraform-lab:~$ aws --endpoint-url http://127.0.0.1:5000 ec2 describe-route-tables --filters Name=association.subnet-id,Values=subnet-be6d56b9e624b0a0f --query 'RouteTables[0].Routes[].{Destination:DestinationCidrBlock,Target:GatewayId}' --output table
+-------------------------------------------
+|           DescribeRouteTables           |
++---------------+-------------------------+
+|  Destination  |         Target          |
++---------------+-------------------------+
+|  10.20.0.0/16 |  local                  |
+|  0.0.0.0/0    |  igw-3c97efabe98084ffe  |
++---------------+-------------------------+
+
+kunal@terraform-lab:~$ aws --endpoint-url http://127.0.0.1:5000 ec2 describe-security-groups --group-ids sg-1b9d1d3ec7c187e46 --query 'SecurityGroups[0].IpPermissions[].{Port:FromPort,Source:IpRanges[0].CidrIp}' --output table
+-----------------------------
+|  DescribeSecurityGroups   |
++-------+-------------------+
+| Port  |      Source       |
++-------+-------------------+
+|  22   |  203.0.113.10/32  |
+|  80   |  0.0.0.0/0        |
+|  443  |  0.0.0.0/0        |
++-------+-------------------+
+
+
+############################################################
+#  5. State
+############################################################
+
+kunal@terraform-lab:~$ terraform state list
+aws_internet_gateway.main
+aws_route_table.public
+aws_route_table_association.public
+aws_security_group.web
+aws_subnet.public
+aws_vpc.main
+
+
+############################################################
+#  6. destroy
+############################################################
+
+kunal@terraform-lab:~$ terraform destroy -input=false -no-color -auto-approve
+aws_vpc.main: Refreshing state... [id=vpc-49839e3b84a6a2207]
+aws_internet_gateway.main: Refreshing state... [id=igw-3c97efabe98084ffe]
+aws_subnet.public: Refreshing state... [id=subnet-be6d56b9e624b0a0f]
+aws_security_group.web: Refreshing state... [id=sg-1b9d1d3ec7c187e46]
+aws_route_table.public: Refreshing state... [id=rtb-6a1a96bee5f4bf6a9]
+aws_route_table_association.public: Refreshing state... [id=rtbassoc-85ed2bb8aa37395a2]
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  - destroy
+
+Terraform will perform the following actions:
+
+  # aws_internet_gateway.main will be destroyed
+  - resource "aws_internet_gateway" "main" {
+      - arn      = "arn:aws:ec2:ap-south-1:123456789012:internet-gateway/igw-3c97efabe98084ffe" -> null
+      - id       = "igw-3c97efabe98084ffe" -> null
+      - owner_id = "123456789012" -> null
+      - tags     = {
+          - "Name" = "kunal-web-igw"
+        } -> null
+      - tags_all = {
+          - "ManagedBy" = "terraform"
+          - "Name"      = "kunal-web-igw"
+          - "Owner"     = "kunal"
+          - "Project"   = "kunal-web"
+        } -> null
+      - vpc_id   = "vpc-49839e3b84a6a2207" -> null
+    }
+
+  # aws_route_table.public will be destroyed
+  - resource "aws_route_table" "public" {
+      - arn              = "arn:aws:ec2:ap-south-1:123456789012:route-table/rtb-6a1a96bee5f4bf6a9" -> null
+      - id               = "rtb-6a1a96bee5f4bf6a9" -> null
+      - owner_id         = "123456789012" -> null
+      - propagating_vgws = [] -> null
+      - route            = [
+          - {
+              - cidr_block                 = "0.0.0.0/0"
+              - gateway_id                 = "igw-3c97efabe98084ffe"
+                # (11 unchanged attributes hidden)
+            },
+        ] -> null
+      - tags             = {
+          - "Name" = "kunal-web-public-rt"
+        } -> null
+      - tags_all         = {
+          - "ManagedBy" = "terraform"
+          - "Name"      = "kunal-web-public-rt"
+          - "Owner"     = "kunal"
+          - "Project"   = "kunal-web"
+        } -> null
+      - vpc_id           = "vpc-49839e3b84a6a2207" -> null
+    }
+
+  # aws_route_table_association.public will be destroyed
+  - resource "aws_route_table_association" "public" {
+      - id             = "rtbassoc-85ed2bb8aa37395a2" -> null
+      - route_table_id = "rtb-6a1a96bee5f4bf6a9" -> null
+      - subnet_id      = "subnet-be6d56b9e624b0a0f" -> null
+        # (1 unchanged attribute hidden)
+    }
+
+  # aws_security_group.web will be destroyed
+  - resource "aws_security_group" "web" {
+      - arn                    = "arn:aws:ec2:ap-south-1:123456789012:security-group/sg-1b9d1d3ec7c187e46" -> null
+      - description            = "HTTP and HTTPS from anywhere, SSH from one address" -> null
+      - egress                 = [
+          - {
+              - cidr_blocks      = [
+                  - "0.0.0.0/0",
+                ]
+              - description      = "All outbound"
+              - from_port        = 0
+              - ipv6_cidr_blocks = []
+              - prefix_list_ids  = []
+              - protocol         = "-1"
+              - security_groups  = []
+              - self             = false
+              - to_port          = 0
+            },
+        ] -> null
+      - id                     = "sg-1b9d1d3ec7c187e46" -> null
+      - ingress                = [
+          - {
+              - cidr_blocks      = [
+                  - "0.0.0.0/0",
+                ]
+              - description      = "HTTP"
+              - from_port        = 80
+              - ipv6_cidr_blocks = []
+              - prefix_list_ids  = []
+              - protocol         = "tcp"
+              - security_groups  = []
+              - self             = false
+              - to_port          = 80
+            },
+          - {
+              - cidr_blocks      = [
+                  - "0.0.0.0/0",
+                ]
+              - description      = "HTTPS"
+              - from_port        = 443
+              - ipv6_cidr_blocks = []
+              - prefix_list_ids  = []
+              - protocol         = "tcp"
+              - security_groups  = []
+              - self             = false
+              - to_port          = 443
+            },
+          - {
+              - cidr_blocks      = [
+                  - "203.0.113.10/32",
+                ]
+              - description      = "SSH, restricted"
+              - from_port        = 22
+              - ipv6_cidr_blocks = []
+              - prefix_list_ids  = []
+              - protocol         = "tcp"
+              - security_groups  = []
+              - self             = false
+              - to_port          = 22
+            },
+        ] -> null
+      - name                   = "kunal-web-web" -> null
+      - owner_id               = "123456789012" -> null
+      - revoke_rules_on_delete = false -> null
+      - tags                   = {
+          - "Name" = "kunal-web-web-sg"
+        } -> null
+      - tags_all               = {
+          - "ManagedBy" = "terraform"
+          - "Name"      = "kunal-web-web-sg"
+          - "Owner"     = "kunal"
+          - "Project"   = "kunal-web"
+        } -> null
+      - vpc_id                 = "vpc-49839e3b84a6a2207" -> null
+        # (1 unchanged attribute hidden)
+    }
+
+  # aws_subnet.public will be destroyed
+  - resource "aws_subnet" "public" {
+      - arn                                            = "arn:aws:ec2:ap-south-1:123456789012:subnet/subnet-be6d56b9e624b0a0f" -> null
+      - assign_ipv6_address_on_creation                = false -> null
+      - availability_zone                              = "ap-south-1a" -> null
+      - availability_zone_id                           = "aps1-az1" -> null
+      - cidr_block                                     = "10.20.1.0/24" -> null
+      - enable_dns64                                   = false -> null
+      - enable_lni_at_device_index                     = 0 -> null
+      - enable_resource_name_dns_a_record_on_launch    = false -> null
+      - enable_resource_name_dns_aaaa_record_on_launch = false -> null
+      - id                                             = "subnet-be6d56b9e624b0a0f" -> null
+      - ipv6_native                                    = false -> null
+      - map_customer_owned_ip_on_launch                = false -> null
+      - map_public_ip_on_launch                        = true -> null
+      - owner_id                                       = "123456789012" -> null
+      - private_dns_hostname_type_on_launch            = "ip-name" -> null
+      - tags                                           = {
+          - "Name" = "kunal-web-public"
+        } -> null
+      - tags_all                                       = {
+          - "ManagedBy" = "terraform"
+          - "Name"      = "kunal-web-public"
+          - "Owner"     = "kunal"
+          - "Project"   = "kunal-web"
+        } -> null
+      - vpc_id                                         = "vpc-49839e3b84a6a2207" -> null
+        # (4 unchanged attributes hidden)
+    }
+
+  # aws_vpc.main will be destroyed
+  - resource "aws_vpc" "main" {
+      - arn                                  = "arn:aws:ec2:ap-south-1:123456789012:vpc/vpc-49839e3b84a6a2207" -> null
+      - assign_generated_ipv6_cidr_block     = false -> null
+      - cidr_block                           = "10.20.0.0/16" -> null
+      - default_network_acl_id               = "acl-4e4a03f32d6318370" -> null
+      - default_route_table_id               = "rtb-5f1511bb2a7b86541" -> null
+      - default_security_group_id            = "sg-0cc54575f50d80d41" -> null
+      - dhcp_options_id                      = "default" -> null
+      - enable_dns_hostnames                 = true -> null
+      - enable_dns_support                   = true -> null
+      - enable_network_address_usage_metrics = false -> null
+      - id                                   = "vpc-49839e3b84a6a2207" -> null
+      - instance_tenancy                     = "default" -> null
+      - ipv6_netmask_length                  = 0 -> null
+      - main_route_table_id                  = "rtb-5f1511bb2a7b86541" -> null
+      - owner_id                             = "123456789012" -> null
+      - tags                                 = {
+          - "Name" = "kunal-web-vpc"
+        } -> null
+      - tags_all                             = {
+          - "ManagedBy" = "terraform"
+          - "Name"      = "kunal-web-vpc"
+          - "Owner"     = "kunal"
+          - "Project"   = "kunal-web"
+        } -> null
+        # (4 unchanged attributes hidden)
+    }
+
+Plan: 0 to add, 0 to change, 6 to destroy.
+
+Changes to Outputs:
+  - internet_gateway_id   = "igw-3c97efabe98084ffe" -> null
+  - public_subnet_id      = "subnet-be6d56b9e624b0a0f" -> null
+  - vpc_id                = "vpc-49839e3b84a6a2207" -> null
+  - web_security_group_id = "sg-1b9d1d3ec7c187e46" -> null
+aws_route_table_association.public: Destroying... [id=rtbassoc-85ed2bb8aa37395a2]
+aws_security_group.web: Destroying... [id=sg-1b9d1d3ec7c187e46]
+aws_route_table_association.public: Destruction complete after 0s
+aws_subnet.public: Destroying... [id=subnet-be6d56b9e624b0a0f]
+aws_route_table.public: Destroying... [id=rtb-6a1a96bee5f4bf6a9]
+aws_subnet.public: Destruction complete after 0s
+aws_security_group.web: Destruction complete after 0s
+aws_route_table.public: Destruction complete after 0s
+aws_internet_gateway.main: Destroying... [id=igw-3c97efabe98084ffe]
+aws_internet_gateway.main: Destruction complete after 0s
+aws_vpc.main: Destroying... [id=vpc-49839e3b84a6a2207]
+aws_vpc.main: Destruction complete after 0s
+
+Destroy complete! Resources: 6 destroyed.
+
+kunal@terraform-lab:~$ aws --endpoint-url http://127.0.0.1:5000 ec2 describe-vpcs --filters Name=tag:Project,Values=kunal-web --query 'length(Vpcs)'
+0
+
+>>> 0 VPCs tagged Project=kunal-web remain
+
+
+############################################################
+#  Verified results: 7 passed, 0 failed
+############################################################
+
+  PASS  the VPC exists with CIDR 10.20.0.0/16
+  PASS  the public subnet is 10.20.1.0/24 and assigns public IPs
+  PASS  an internet gateway is attached to the VPC
+  PASS  the subnet routes 0.0.0.0/0 to the internet gateway
+  PASS  the security group opens exactly 22, 80 and 443 (22 80 443)
+  PASS  SSH is open to a single /32, not the internet (203.0.113.10/32)
+  PASS  destroy removed the VPC
+

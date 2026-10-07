@@ -1,0 +1,86 @@
+
+############################################################
+#  08.1  cluster is up, and the control plane runs as pods
+############################################################
+
+kunal@kind-lab:~/devops-heros$ echo cluster flavour detected: kind
+cluster flavour detected: kind
+
+kunal@kind-lab:~/devops-heros$ kubectl cluster-info
+Kubernetes control plane is running at https://127.0.0.1:38331
+CoreDNS is running at https://127.0.0.1:38331/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+
+To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+
+kunal@kind-lab:~/devops-heros$ kubectl get nodes -o wide
+NAME                   STATUS   ROLES           AGE   VERSION   INTERNAL-IP   EXTERNAL-IP   OS-IMAGE                       KERNEL-VERSION              CONTAINER-RUNTIME
+devops-control-plane   Ready    control-plane   49s   v1.37.0   172.18.0.3    <none>        Debian GNU/Linux 13 (trixie)   6.17.0-1022-azure (amd64)   containerd://2.3.4
+devops-worker          Ready    <none>          35s   v1.37.0   172.18.0.2    <none>        Debian GNU/Linux 13 (trixie)   6.17.0-1022-azure (amd64)   containerd://2.3.4
+
+kunal@kind-lab:~/devops-heros$ kubectl version
+Client Version: v1.37.1
+Kustomize Version: v5.8.1
+Server Version: v1.37.0
+
+kunal@kind-lab:~/devops-heros$ kubectl get pods -n kube-system -o wide
+NAME                                           READY   STATUS        RESTARTS   AGE   IP           NODE                   NOMINATED NODE   READINESS GATES
+coredns-559f6c778d-fr8ld                       1/1     Running       0          40s   10.244.0.2   devops-control-plane   <none>           <none>
+coredns-559f6c778d-m5lr2                       1/1     Running       0          40s   10.244.0.3   devops-control-plane   <none>           <none>
+etcd-devops-control-plane                      1/1     Running       0          47s   172.18.0.3   devops-control-plane   <none>           <none>
+kindnet-mkjzw                                  1/1     Running       0          40s   172.18.0.3   devops-control-plane   <none>           <none>
+kindnet-p9v5h                                  1/1     Running       0          35s   172.18.0.2   devops-worker          <none>           <none>
+kube-apiserver-devops-control-plane            1/1     Running       0          47s   172.18.0.3   devops-control-plane   <none>           <none>
+kube-controller-manager-devops-control-plane   1/1     Running       0          47s   172.18.0.3   devops-control-plane   <none>           <none>
+kube-proxy-2dm7l                               1/1     Running       0          40s   172.18.0.3   devops-control-plane   <none>           <none>
+kube-proxy-57w5d                               1/1     Running       0          35s   172.18.0.2   devops-worker          <none>           <none>
+kube-scheduler-devops-control-plane            1/1     Running       0          47s   172.18.0.3   devops-control-plane   <none>           <none>
+metrics-server-5cd9456644-sgf8k                0/1     Terminating   0          28s   10.244.1.3   devops-worker          <none>           <none>
+metrics-server-68675c76b5-8vhv6                1/1     Running       0          28s   10.244.1.2   devops-worker          <none>           <none>
+
+
+############################################################
+#  08.2  every kind this cluster knows about
+############################################################
+
+kunal@kind-lab:~/devops-heros$ kubectl api-resources | head -40
+NAME                                SHORTNAMES   APIVERSION                        NAMESPACED   KIND
+bindings                                         v1                                true         Binding
+componentstatuses                   cs           v1                                false        ComponentStatus
+configmaps                          cm           v1                                true         ConfigMap
+endpoints                           ep           v1                                true         Endpoints
+events                              ev           v1                                true         Event
+limitranges                         limits       v1                                true         LimitRange
+namespaces                          ns           v1                                false        Namespace
+nodes                               no           v1                                false        Node
+persistentvolumeclaims              pvc          v1                                true         PersistentVolumeClaim
+persistentvolumes                   pv           v1                                false        PersistentVolume
+pods                                po           v1                                true         Pod
+podtemplates                                     v1                                true         PodTemplate
+replicationcontrollers              rc           v1                                true         ReplicationController
+resourcequotas                      quota        v1                                true         ResourceQuota
+secrets                                          v1                                true         Secret
+serviceaccounts                     sa           v1                                true         ServiceAccount
+services                            svc          v1                                true         Service
+mutatingadmissionpolicies                        admissionregistration.k8s.io/v1   false        MutatingAdmissionPolicy
+mutatingadmissionpolicybindings                  admissionregistration.k8s.io/v1   false        MutatingAdmissionPolicyBinding
+mutatingwebhookconfigurations                    admissionregistration.k8s.io/v1   false        MutatingWebhookConfiguration
+validatingadmissionpolicies                      admissionregistration.k8s.io/v1   false        ValidatingAdmissionPolicy
+validatingadmissionpolicybindings                admissionregistration.k8s.io/v1   false        ValidatingAdmissionPolicyBinding
+validatingwebhookconfigurations                  admissionregistration.k8s.io/v1   false        ValidatingWebhookConfiguration
+customresourcedefinitions           crd,crds     apiextensions.k8s.io/v1           false        CustomResourceDefinition
+apiservices                                      apiregistration.k8s.io/v1         false        APIService
+controllerrevisions                              apps/v1                           true         ControllerRevision
+daemonsets                          ds           apps/v1                           true         DaemonSet
+deployments                         deploy       apps/v1                           true         Deployment
+replicasets                         rs           apps/v1                           true         ReplicaSet
+statefulsets                        sts          apps/v1                           true         StatefulSet
+selfsubjectreviews                               authentication.k8s.io/v1          false        SelfSubjectReview
+tokenreviews                                     authentication.k8s.io/v1          false        TokenReview
+localsubjectaccessreviews                        authorization.k8s.io/v1           true         LocalSubjectAccessReview
+selfsubjectaccessreviews                         authorization.k8s.io/v1           false        SelfSubjectAccessReview
+selfsubjectrulesreviews                          authorization.k8s.io/v1           false        SelfSubjectRulesReview
+subjectaccessreviews                             authorization.k8s.io/v1           false        SubjectAccessReview
+horizontalpodautoscalers            hpa          autoscaling/v2                    true         HorizontalPodAutoscaler
+cronjobs                            cj           batch/v1                          true         CronJob
+jobs                                             batch/v1                          true         Job
+

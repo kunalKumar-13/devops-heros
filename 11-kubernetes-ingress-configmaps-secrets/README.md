@@ -7,14 +7,10 @@ Manifests: [`01-configmap/`](01-configmap/) · [`02-secret/`](02-secret/) ·
 [`03-ingress/`](03-ingress/) · [`04-full-demo/`](04-full-demo/) (one script that wires
 all three together).
 
-> **Evidence note** — sections 01–07 carry captured terminal output and screenshots
-> from a live Ubuntu VM. These Kubernetes sections do **not** yet: the write-up and
-> the manifests are complete and applied-tested for schema, but no cluster run is
-> recorded here, and nothing below is presented as captured output. To produce that
-> evidence, bring up the cluster from
-> [section 08 §5](../08-kubernetes-fundamentals/#5-lab-environment-used-for-sections-0911)
-> and run [`logs/capture-k8s.sh`](../logs/capture-k8s.sh) `4` — it runs every command
-> in this section and writes the transcript to `logs/k8s4.txt`.
+> **Evidence.** Run on a real cluster (kind, 2 nodes) in GitHub Actions by
+> [`logs/capture-k8s.sh`](../logs/capture-k8s.sh) `4`, which prints each command before its
+> output. The full, unedited transcript is [`logs/k8s4.txt`](../logs/k8s4.txt): every command in this section: the ConfigMap and Secret consumed by pods, path-based and host-based Ingress answering real requests, and the deliberate 404 and 503.
+> Run: <https://github.com/kunalKumar-13/devops-heros/actions/runs/37657639033>
 
 ---
 

@@ -1,0 +1,521 @@
+
+############################################################
+#  0. The code (unchanged real-AWS Terraform)
+############################################################
+
+kunal@terraform-lab:~$ ls -1 *.tf | grep -v override
+main.tf
+outputs.tf
+providers.tf
+variables.tf
+versions.tf
+
+>>> emulator_override.tf points the provider at http://127.0.0.1:5000 for this run; it is git-ignored
+
+
+############################################################
+#  1. terraform init  (downloads the aws and random providers)
+############################################################
+
+kunal@terraform-lab:~$ terraform init -input=false -no-color
+Initializing the backend...
+Initializing provider plugins...
+- Reusing previous version of hashicorp/random from the dependency lock file
+- Reusing previous version of hashicorp/aws from the dependency lock file
+- Installing hashicorp/random v3.9.1...
+- Installed hashicorp/random v3.9.1 (signed by HashiCorp)
+- Installing hashicorp/aws v5.100.0...
+- Installed hashicorp/aws v5.100.0 (signed by HashiCorp)
+Terraform has made some changes to the provider dependency selections recorded
+in the .terraform.lock.hcl file. Review those changes and commit them to your
+version control system if they represent changes you intended to make.
+
+Terraform has been successfully initialized!
+
+You may now begin working with Terraform. Try running "terraform plan" to see
+any changes that are required for your infrastructure. All Terraform commands
+should now work.
+
+If you ever set or change modules or backend configuration for Terraform,
+rerun this command to reinitialize your working directory. If you forget, other
+commands will detect it and remind you to do so if necessary.
+
+
+############################################################
+#  2. terraform fmt and validate
+############################################################
+
+kunal@terraform-lab:~$ terraform fmt -check -diff
+
+kunal@terraform-lab:~$ terraform validate -no-color
+Success! The configuration is valid.
+
+
+
+############################################################
+#  3. terraform plan
+############################################################
+
+kunal@terraform-lab:~$ terraform plan -input=false -no-color -out=tfplan
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+  # aws_s3_bucket.this will be created
+  + resource "aws_s3_bucket" "this" {
+      + acceleration_status         = (known after apply)
+      + acl                         = (known after apply)
+      + arn                         = (known after apply)
+      + bucket                      = (known after apply)
+      + bucket_domain_name          = (known after apply)
+      + bucket_prefix               = (known after apply)
+      + bucket_regional_domain_name = (known after apply)
+      + force_destroy               = false
+      + hosted_zone_id              = (known after apply)
+      + id                          = (known after apply)
+      + object_lock_enabled         = (known after apply)
+      + policy                      = (known after apply)
+      + region                      = (known after apply)
+      + request_payer               = (known after apply)
+      + tags                        = {
+          + "Environment" = "dev"
+          + "Name"        = "kunal-devops-dev"
+        }
+      + tags_all                    = {
+          + "Environment" = "dev"
+          + "ManagedBy"   = "terraform"
+          + "Name"        = "kunal-devops-dev"
+          + "Owner"       = "kunal"
+          + "Project"     = "kunal-devops"
+        }
+      + website_domain              = (known after apply)
+      + website_endpoint            = (known after apply)
+
+      + cors_rule (known after apply)
+
+      + grant (known after apply)
+
+      + lifecycle_rule (known after apply)
+
+      + logging (known after apply)
+
+      + object_lock_configuration (known after apply)
+
+      + replication_configuration (known after apply)
+
+      + server_side_encryption_configuration (known after apply)
+
+      + versioning (known after apply)
+
+      + website (known after apply)
+    }
+
+  # aws_s3_bucket_public_access_block.this will be created
+  + resource "aws_s3_bucket_public_access_block" "this" {
+      + block_public_acls       = true
+      + block_public_policy     = true
+      + bucket                  = (known after apply)
+      + id                      = (known after apply)
+      + ignore_public_acls      = true
+      + restrict_public_buckets = true
+    }
+
+  # aws_s3_bucket_server_side_encryption_configuration.this will be created
+  + resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
+      + bucket = (known after apply)
+      + id     = (known after apply)
+
+      + rule {
+          + apply_server_side_encryption_by_default {
+              + sse_algorithm     = "AES256"
+                # (1 unchanged attribute hidden)
+            }
+        }
+    }
+
+  # aws_s3_bucket_versioning.this will be created
+  + resource "aws_s3_bucket_versioning" "this" {
+      + bucket = (known after apply)
+      + id     = (known after apply)
+
+      + versioning_configuration {
+          + mfa_delete = (known after apply)
+          + status     = "Enabled"
+        }
+    }
+
+  # random_id.suffix will be created
+  + resource "random_id" "suffix" {
+      + b64_std     = (known after apply)
+      + b64_url     = (known after apply)
+      + byte_length = 4
+      + dec         = (known after apply)
+      + hex         = (known after apply)
+      + id          = (known after apply)
+    }
+
+Plan: 5 to add, 0 to change, 0 to destroy.
+
+Changes to Outputs:
+  + bucket_arn  = (known after apply)
+  + bucket_name = (known after apply)
+  + versioning  = "Enabled"
+
+─────────────────────────────────────────────────────────────────────────────
+
+Saved the plan to: tfplan
+
+To perform exactly these actions, run the following command to apply:
+    terraform apply "tfplan"
+
+
+############################################################
+#  4. terraform apply
+############################################################
+
+kunal@terraform-lab:~$ terraform apply -input=false -no-color tfplan
+random_id.suffix: Creating...
+random_id.suffix: Creation complete after 0s [id=T4ODpw]
+aws_s3_bucket.this: Creating...
+aws_s3_bucket.this: Creation complete after 0s [id=kunal-devops-dev-4f8383a7]
+aws_s3_bucket_versioning.this: Creating...
+aws_s3_bucket_public_access_block.this: Creating...
+aws_s3_bucket_server_side_encryption_configuration.this: Creating...
+aws_s3_bucket_public_access_block.this: Creation complete after 0s [id=kunal-devops-dev-4f8383a7]
+aws_s3_bucket_server_side_encryption_configuration.this: Creation complete after 0s [id=kunal-devops-dev-4f8383a7]
+aws_s3_bucket_versioning.this: Creation complete after 1s [id=kunal-devops-dev-4f8383a7]
+
+Apply complete! Resources: 5 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+bucket_arn = "arn:aws:s3:::kunal-devops-dev-4f8383a7"
+bucket_name = "kunal-devops-dev-4f8383a7"
+versioning = "Enabled"
+
+
+############################################################
+#  5. State: what Terraform now tracks
+############################################################
+
+kunal@terraform-lab:~$ terraform state list
+aws_s3_bucket.this
+aws_s3_bucket_public_access_block.this
+aws_s3_bucket_server_side_encryption_configuration.this
+aws_s3_bucket_versioning.this
+random_id.suffix
+
+kunal@terraform-lab:~$ terraform state show -no-color aws_s3_bucket.this | grep -E 'bucket |arn |tags'
+    arn                         = "arn:aws:s3:::kunal-devops-dev-4f8383a7"
+    bucket                      = "kunal-devops-dev-4f8383a7"
+    tags                        = {
+    tags_all                    = {
+
+
+############################################################
+#  6. Outputs
+############################################################
+
+kunal@terraform-lab:~$ terraform output -no-color
+bucket_arn = "arn:aws:s3:::kunal-devops-dev-4f8383a7"
+bucket_name = "kunal-devops-dev-4f8383a7"
+versioning = "Enabled"
+
+
+############################################################
+#  7. Verify with the AWS CLI, independently of Terraform
+############################################################
+
+kunal@terraform-lab:~$ aws --endpoint-url http://127.0.0.1:5000 s3api list-buckets --query 'Buckets[].Name' --output text
+kunal-devops-dev-4f8383a7
+
+kunal@terraform-lab:~$ aws --endpoint-url http://127.0.0.1:5000 s3api get-bucket-versioning --bucket kunal-devops-dev-4f8383a7
+{
+    "Status": "Enabled"
+}
+
+kunal@terraform-lab:~$ aws --endpoint-url http://127.0.0.1:5000 s3api get-bucket-encryption --bucket kunal-devops-dev-4f8383a7 --query 'ServerSideEncryptionConfiguration.Rules[0]'
+{
+    "ApplyServerSideEncryptionByDefault": {
+        "SSEAlgorithm": "AES256"
+    },
+    "BucketKeyEnabled": false
+}
+
+kunal@terraform-lab:~$ aws --endpoint-url http://127.0.0.1:5000 s3api get-public-access-block --bucket kunal-devops-dev-4f8383a7
+{
+    "PublicAccessBlockConfiguration": {
+        "BlockPublicAcls": true,
+        "IgnorePublicAcls": true,
+        "BlockPublicPolicy": true,
+        "RestrictPublicBuckets": true
+    }
+}
+
+kunal@terraform-lab:~$ echo 'hello from kunal' > note.txt && aws --endpoint-url http://127.0.0.1:5000 s3 cp note.txt s3://kunal-devops-dev-4f8383a7/note.txt && aws --endpoint-url http://127.0.0.1:5000 s3 ls s3://kunal-devops-dev-4f8383a7/
+Completed 17 Bytes/17 Bytes (1009 Bytes/s) with 1 file(s) remainingupload: ./note.txt to s3://kunal-devops-dev-4f8383a7/note.txt      
+2026-10-07 17:16:05         17 note.txt
+
+
+############################################################
+#  8. Idempotence: planning again changes nothing
+############################################################
+
+kunal@terraform-lab:~$ terraform plan -input=false -no-color -detailed-exitcode
+random_id.suffix: Refreshing state... [id=T4ODpw]
+aws_s3_bucket.this: Refreshing state... [id=kunal-devops-dev-4f8383a7]
+aws_s3_bucket_server_side_encryption_configuration.this: Refreshing state... [id=kunal-devops-dev-4f8383a7]
+aws_s3_bucket_versioning.this: Refreshing state... [id=kunal-devops-dev-4f8383a7]
+aws_s3_bucket_public_access_block.this: Refreshing state... [id=kunal-devops-dev-4f8383a7]
+
+No changes. Your infrastructure matches the configuration.
+
+Terraform has compared your real infrastructure against your configuration
+and found no differences, so no changes are needed.
+
+>>> exit code 0 from -detailed-exitcode means: no changes
+
+
+############################################################
+#  9. A change: turn versioning off, see an in-place update
+############################################################
+
+kunal@terraform-lab:~$ terraform plan -input=false -no-color -var enable_versioning=false
+random_id.suffix: Refreshing state... [id=T4ODpw]
+aws_s3_bucket.this: Refreshing state... [id=kunal-devops-dev-4f8383a7]
+aws_s3_bucket_public_access_block.this: Refreshing state... [id=kunal-devops-dev-4f8383a7]
+aws_s3_bucket_server_side_encryption_configuration.this: Refreshing state... [id=kunal-devops-dev-4f8383a7]
+aws_s3_bucket_versioning.this: Refreshing state... [id=kunal-devops-dev-4f8383a7]
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  ~ update in-place
+
+Terraform will perform the following actions:
+
+  # aws_s3_bucket_versioning.this will be updated in-place
+  ~ resource "aws_s3_bucket_versioning" "this" {
+        id                    = "kunal-devops-dev-4f8383a7"
+        # (2 unchanged attributes hidden)
+
+      ~ versioning_configuration {
+          ~ status     = "Enabled" -> "Suspended"
+            # (1 unchanged attribute hidden)
+        }
+    }
+
+Plan: 0 to add, 1 to change, 0 to destroy.
+
+Changes to Outputs:
+  ~ versioning  = "Enabled" -> "Suspended"
+
+─────────────────────────────────────────────────────────────────────────────
+
+Note: You didn't use the -out option to save this plan, so Terraform can't
+guarantee to take exactly these actions if you run "terraform apply" now.
+
+kunal@terraform-lab:~$ terraform apply -input=false -no-color -auto-approve -var enable_versioning=false
+random_id.suffix: Refreshing state... [id=T4ODpw]
+aws_s3_bucket.this: Refreshing state... [id=kunal-devops-dev-4f8383a7]
+aws_s3_bucket_public_access_block.this: Refreshing state... [id=kunal-devops-dev-4f8383a7]
+aws_s3_bucket_versioning.this: Refreshing state... [id=kunal-devops-dev-4f8383a7]
+aws_s3_bucket_server_side_encryption_configuration.this: Refreshing state... [id=kunal-devops-dev-4f8383a7]
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  ~ update in-place
+
+Terraform will perform the following actions:
+
+  # aws_s3_bucket_versioning.this will be updated in-place
+  ~ resource "aws_s3_bucket_versioning" "this" {
+        id                    = "kunal-devops-dev-4f8383a7"
+        # (2 unchanged attributes hidden)
+
+      ~ versioning_configuration {
+          ~ status     = "Enabled" -> "Suspended"
+            # (1 unchanged attribute hidden)
+        }
+    }
+
+Plan: 0 to add, 1 to change, 0 to destroy.
+
+Changes to Outputs:
+  ~ versioning  = "Enabled" -> "Suspended"
+aws_s3_bucket_versioning.this: Modifying... [id=kunal-devops-dev-4f8383a7]
+aws_s3_bucket_versioning.this: Modifications complete after 1s [id=kunal-devops-dev-4f8383a7]
+
+Apply complete! Resources: 0 added, 1 changed, 0 destroyed.
+
+Outputs:
+
+bucket_arn = "arn:aws:s3:::kunal-devops-dev-4f8383a7"
+bucket_name = "kunal-devops-dev-4f8383a7"
+versioning = "Suspended"
+
+kunal@terraform-lab:~$ aws --endpoint-url http://127.0.0.1:5000 s3api get-bucket-versioning --bucket kunal-devops-dev-4f8383a7
+{
+    "Status": "Suspended"
+}
+
+
+############################################################
+#  10. terraform destroy
+############################################################
+
+kunal@terraform-lab:~$ aws --endpoint-url http://127.0.0.1:5000 s3 rm s3://kunal-devops-dev-4f8383a7 --recursive
+delete: s3://kunal-devops-dev-4f8383a7/note.txt
+
+kunal@terraform-lab:~$ terraform destroy -input=false -no-color -auto-approve -var enable_versioning=false
+random_id.suffix: Refreshing state... [id=T4ODpw]
+aws_s3_bucket.this: Refreshing state... [id=kunal-devops-dev-4f8383a7]
+aws_s3_bucket_versioning.this: Refreshing state... [id=kunal-devops-dev-4f8383a7]
+aws_s3_bucket_public_access_block.this: Refreshing state... [id=kunal-devops-dev-4f8383a7]
+aws_s3_bucket_server_side_encryption_configuration.this: Refreshing state... [id=kunal-devops-dev-4f8383a7]
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  - destroy
+
+Terraform will perform the following actions:
+
+  # aws_s3_bucket.this will be destroyed
+  - resource "aws_s3_bucket" "this" {
+      - arn                         = "arn:aws:s3:::kunal-devops-dev-4f8383a7" -> null
+      - bucket                      = "kunal-devops-dev-4f8383a7" -> null
+      - bucket_domain_name          = "kunal-devops-dev-4f8383a7.s3.amazonaws.com" -> null
+      - bucket_regional_domain_name = "kunal-devops-dev-4f8383a7.s3.ap-south-1.amazonaws.com" -> null
+      - force_destroy               = false -> null
+      - hosted_zone_id              = "Z11RGJOFQNVJUP" -> null
+      - id                          = "kunal-devops-dev-4f8383a7" -> null
+      - object_lock_enabled         = false -> null
+      - region                      = "ap-south-1" -> null
+      - tags                        = {
+          - "Environment" = "dev"
+          - "Name"        = "kunal-devops-dev"
+        } -> null
+      - tags_all                    = {
+          - "Environment" = "dev"
+          - "ManagedBy"   = "terraform"
+          - "Name"        = "kunal-devops-dev"
+          - "Owner"       = "kunal"
+          - "Project"     = "kunal-devops"
+        } -> null
+        # (4 unchanged attributes hidden)
+
+      - grant {
+          - id          = "75aa57f09aa0c8caeab4f8c24e99d10f8e7faeebf76c078efc7c6caea54ba06a" -> null
+          - permissions = [
+              - "FULL_CONTROL",
+            ] -> null
+          - type        = "CanonicalUser" -> null
+            # (1 unchanged attribute hidden)
+        }
+
+      - server_side_encryption_configuration {
+          - rule {
+              - bucket_key_enabled = false -> null
+
+              - apply_server_side_encryption_by_default {
+                  - sse_algorithm     = "AES256" -> null
+                    # (1 unchanged attribute hidden)
+                }
+            }
+        }
+
+      - versioning {
+          - enabled    = false -> null
+          - mfa_delete = false -> null
+        }
+    }
+
+  # aws_s3_bucket_public_access_block.this will be destroyed
+  - resource "aws_s3_bucket_public_access_block" "this" {
+      - block_public_acls       = true -> null
+      - block_public_policy     = true -> null
+      - bucket                  = "kunal-devops-dev-4f8383a7" -> null
+      - id                      = "kunal-devops-dev-4f8383a7" -> null
+      - ignore_public_acls      = true -> null
+      - restrict_public_buckets = true -> null
+    }
+
+  # aws_s3_bucket_server_side_encryption_configuration.this will be destroyed
+  - resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
+      - bucket                = "kunal-devops-dev-4f8383a7" -> null
+      - id                    = "kunal-devops-dev-4f8383a7" -> null
+        # (1 unchanged attribute hidden)
+
+      - rule {
+          - bucket_key_enabled = false -> null
+
+          - apply_server_side_encryption_by_default {
+              - sse_algorithm     = "AES256" -> null
+                # (1 unchanged attribute hidden)
+            }
+        }
+    }
+
+  # aws_s3_bucket_versioning.this will be destroyed
+  - resource "aws_s3_bucket_versioning" "this" {
+      - bucket                = "kunal-devops-dev-4f8383a7" -> null
+      - id                    = "kunal-devops-dev-4f8383a7" -> null
+        # (1 unchanged attribute hidden)
+
+      - versioning_configuration {
+          - status     = "Suspended" -> null
+            # (1 unchanged attribute hidden)
+        }
+    }
+
+  # random_id.suffix will be destroyed
+  - resource "random_id" "suffix" {
+      - b64_std     = "T4ODpw==" -> null
+      - b64_url     = "T4ODpw" -> null
+      - byte_length = 4 -> null
+      - dec         = "1334018983" -> null
+      - hex         = "4f8383a7" -> null
+      - id          = "T4ODpw" -> null
+    }
+
+Plan: 0 to add, 0 to change, 5 to destroy.
+
+Changes to Outputs:
+  - bucket_arn  = "arn:aws:s3:::kunal-devops-dev-4f8383a7" -> null
+  - bucket_name = "kunal-devops-dev-4f8383a7" -> null
+  - versioning  = "Suspended" -> null
+aws_s3_bucket_server_side_encryption_configuration.this: Destroying... [id=kunal-devops-dev-4f8383a7]
+aws_s3_bucket_versioning.this: Destroying... [id=kunal-devops-dev-4f8383a7]
+aws_s3_bucket_public_access_block.this: Destroying... [id=kunal-devops-dev-4f8383a7]
+aws_s3_bucket_versioning.this: Destruction complete after 0s
+aws_s3_bucket_server_side_encryption_configuration.this: Destruction complete after 0s
+aws_s3_bucket_public_access_block.this: Destruction complete after 0s
+aws_s3_bucket.this: Destroying... [id=kunal-devops-dev-4f8383a7]
+aws_s3_bucket.this: Destruction complete after 0s
+random_id.suffix: Destroying... [id=T4ODpw]
+random_id.suffix: Destruction complete after 0s
+
+Destroy complete! Resources: 5 destroyed.
+
+kunal@terraform-lab:~$ terraform state list
+
+kunal@terraform-lab:~$ aws --endpoint-url http://127.0.0.1:5000 s3api list-buckets --query 'Buckets[].Name' --output text; echo '(no buckets left)'
+(no buckets left)
+
+
+############################################################
+#  Verified results: 9 passed, 0 failed
+############################################################
+
+  PASS  apply created the bucket (kunal-devops-dev-4f8383a7)
+  PASS  versioning is Enabled
+  PASS  objects are encrypted at rest with AES256
+  PASS  all four public-access blocks are on
+  PASS  an object can be written and read back
+  PASS  re-planning finds no changes (idempotent)
+  PASS  the change was applied in place (versioning Suspended)
+  PASS  destroy removed the bucket
+  PASS  state is empty after destroy
+

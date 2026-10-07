@@ -1,0 +1,222 @@
+
+############################################################
+#  1. Chart structure
+############################################################
+
+kunal@kind-lab:~$ find notes-chart -type f | sort
+notes-chart/Chart.yaml
+notes-chart/templates/_helpers.tpl
+notes-chart/templates/configmap.yaml
+notes-chart/templates/deployment.yaml
+notes-chart/templates/service.yaml
+notes-chart/values-prod.yaml
+notes-chart/values.yaml
+
+kunal@kind-lab:~$ cat notes-chart/Chart.yaml
+apiVersion: v2
+name: notes-chart
+description: A small notes app (nginx serving a page built from values) packaged with Helm
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+maintainers:
+  - name: Kunal Kumar
+
+
+############################################################
+#  2. Lint
+############################################################
+
+kunal@kind-lab:~$ helm lint notes-chart
+==> Linting notes-chart
+[INFO] Chart.yaml: icon is recommended
+
+1 chart(s) linted, 0 chart(s) failed
+
+kunal@kind-lab:~$ helm lint notes-chart -f notes-chart/values-prod.yaml
+==> Linting notes-chart
+[INFO] Chart.yaml: icon is recommended
+
+1 chart(s) linted, 0 chart(s) failed
+
+
+############################################################
+#  3. Render locally without installing
+############################################################
+
+kunal@kind-lab:~$ helm template notes-dev notes-chart | grep -E '^kind|replicas:|image:'
+kind: ConfigMap
+         image: <b>nginx:1.26-alpine</b></p>
+kind: Service
+kind: Deployment
+  replicas: 1
+          image: "nginx:1.26-alpine"
+
+kunal@kind-lab:~$ helm template notes-dev notes-chart -f notes-chart/values-prod.yaml | grep -E '^kind|replicas:|image:'
+kind: ConfigMap
+         image: <b>nginx:1.27-alpine</b></p>
+kind: Service
+kind: Deployment
+  replicas: 3
+          image: "nginx:1.27-alpine"
+
+
+############################################################
+#  4. Install (development values)
+############################################################
+
+kunal@kind-lab:~$ helm install notes-dev notes-chart --wait --timeout 3m
+NAME: notes-dev
+LAST DEPLOYED: Wed Oct  7 17:28:45 2026
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+
+kunal@kind-lab:~$ kubectl get pods -l app=notes-dev
+NAME                                READY   STATUS    RESTARTS   AGE
+notes-dev-deploy-5bf4b5db4b-jmwwm   1/1     Running   0          2s
+
+kunal@kind-lab:~$ kubectl get services notes-dev-svc
+NAME            TYPE       CLUSTER-IP    EXTERNAL-IP   PORT(S)        AGE
+notes-dev-svc   NodePort   10.96.45.44   <none>        80:30090/TCP   2s
+
+kunal@kind-lab:~$ kubectl get configmaps notes-dev-config
+NAME               DATA   AGE
+notes-dev-config   3      2s
+
+>>> the page the app is serving now:
+
+kunal@kind-lab:~$ curl -s http://notes-dev-svc
+environment: development | release: notes-dev | revision: 1 | image: nginx:1.26-alpine Helm turns a directory of templates into a versioned release values.yaml is the default; -f values-prod.yaml overrides it helm rollback restores any earlier revision notes-app notes-app environment: development | release: notes-dev | revision: 1 | image: nginx:1.26-alpine
+
+
+############################################################
+#  5. Upgrade to production values
+############################################################
+
+kunal@kind-lab:~$ helm upgrade notes-dev notes-chart -f notes-chart/values-prod.yaml --wait --timeout 3m
+Release "notes-dev" has been upgraded. Happy Helming!
+NAME: notes-dev
+LAST DEPLOYED: Wed Oct  7 17:28:52 2026
+NAMESPACE: default
+STATUS: deployed
+REVISION: 2
+TEST SUITE: None
+
+kunal@kind-lab:~$ kubectl get pods -l app=notes-dev
+NAME                                READY   STATUS    RESTARTS   AGE
+notes-dev-deploy-57cf78c576-fzsv6   1/1     Running   0          4s
+notes-dev-deploy-57cf78c576-msrdd   1/1     Running   0          3s
+notes-dev-deploy-57cf78c576-zwh9z   1/1     Running   0          4s
+
+kunal@kind-lab:~$ curl -s http://notes-dev-svc
+environment: production | release: notes-dev | revision: 2 | image: nginx:1.27-alpine Helm turns a directory of templates into a versioned release values.yaml is the default; -f values-prod.yaml overrides it helm rollback restores any earlier revision notes-app notes-app environment: production | release: notes-dev | revision: 2 | image: nginx:1.27-alpine
+
+
+############################################################
+#  6. Release history
+############################################################
+
+kunal@kind-lab:~$ helm history notes-dev
+REVISION	UPDATED                 	STATUS    	CHART            	APP VERSION	DESCRIPTION     
+1       	Wed Oct  7 17:28:45 2026	superseded	notes-chart-0.1.0	1.0.0      	Install complete
+2       	Wed Oct  7 17:28:52 2026	deployed  	notes-chart-0.1.0	1.0.0      	Upgrade complete
+
+
+############################################################
+#  7. A bad upgrade: an image tag that does not exist
+############################################################
+
+>>> --wait makes Helm wait for the rollout, so a broken image fails the release instead of quietly succeeding
+
+kunal@kind-lab:~$ helm upgrade notes-dev notes-chart -f notes-chart/values-prod.yaml --set image.tag=9.99-doesnotexist --wait --timeout 60s
+Error: UPGRADE FAILED: context deadline exceeded
+
+kunal@kind-lab:~$ helm history notes-dev
+REVISION	UPDATED                 	STATUS    	CHART            	APP VERSION	DESCRIPTION                                          
+1       	Wed Oct  7 17:28:45 2026	superseded	notes-chart-0.1.0	1.0.0      	Install complete                                     
+2       	Wed Oct  7 17:28:52 2026	deployed  	notes-chart-0.1.0	1.0.0      	Upgrade complete                                     
+3       	Wed Oct  7 17:29:00 2026	failed    	notes-chart-0.1.0	1.0.0      	Upgrade "notes-dev" failed: context deadline exceeded
+
+kunal@kind-lab:~$ kubectl get pods -l app=notes-dev
+NAME                                READY   STATUS         RESTARTS   AGE
+notes-dev-deploy-57cf78c576-fzsv6   1/1     Running        0          68s
+notes-dev-deploy-57cf78c576-msrdd   1/1     Running        0          67s
+notes-dev-deploy-57cf78c576-zwh9z   1/1     Running        0          68s
+notes-dev-deploy-8675d5688c-v2tww   0/1     ErrImagePull   0          60s
+
+>>> the old ReplicaSet's pods are still serving: a failed rolling update never removes working pods before new ones are ready
+
+
+############################################################
+#  8. Roll back to revision 2
+############################################################
+
+kunal@kind-lab:~$ helm rollback notes-dev 2 --wait --timeout 3m
+Rollback was a success! Happy Helming!
+
+kunal@kind-lab:~$ helm history notes-dev
+REVISION	UPDATED                 	STATUS    	CHART            	APP VERSION	DESCRIPTION                                          
+1       	Wed Oct  7 17:28:45 2026	superseded	notes-chart-0.1.0	1.0.0      	Install complete                                     
+2       	Wed Oct  7 17:28:52 2026	superseded	notes-chart-0.1.0	1.0.0      	Upgrade complete                                     
+3       	Wed Oct  7 17:29:00 2026	failed    	notes-chart-0.1.0	1.0.0      	Upgrade "notes-dev" failed: context deadline exceeded
+4       	Wed Oct  7 17:30:00 2026	deployed  	notes-chart-0.1.0	1.0.0      	Rollback to 2                                        
+
+kunal@kind-lab:~$ kubectl rollout status deployment/notes-dev-deploy --timeout=180s
+deployment "notes-dev-deploy" successfully rolled out
+
+kunal@kind-lab:~$ kubectl get pods -l app=notes-dev
+NAME                                READY   STATUS    RESTARTS   AGE
+notes-dev-deploy-57cf78c576-fzsv6   1/1     Running   0          70s
+notes-dev-deploy-57cf78c576-msrdd   1/1     Running   0          69s
+notes-dev-deploy-57cf78c576-zwh9z   1/1     Running   0          70s
+
+kunal@kind-lab:~$ curl -s http://notes-dev-svc
+environment: production | release: notes-dev | revision: 2 | image: nginx:1.27-alpine
+
+
+############################################################
+#  9. What Helm stored about the release
+############################################################
+
+kunal@kind-lab:~$ helm list
+NAME     	NAMESPACE	REVISION	UPDATED                                	STATUS  	CHART            	APP VERSION
+notes-dev	default  	4       	2026-10-07 17:30:00.359369468 +0000 UTC	deployed	notes-chart-0.1.0	1.0.0      
+
+kunal@kind-lab:~$ helm get values notes-dev --revision 2
+USER-SUPPLIED VALUES:
+app:
+  environment: production
+  name: notes-app
+image:
+  repository: nginx
+  tag: 1.27-alpine
+replicaCount: 3
+
+
+############################################################
+#  10. Clean up
+############################################################
+
+kunal@kind-lab:~$ helm uninstall notes-dev
+release "notes-dev" uninstalled
+
+kunal@kind-lab:~$ kubectl get all -l app=notes-dev
+No resources found in default namespace.
+
+
+############################################################
+#  Verified results: 9 passed, 0 failed
+############################################################
+
+  PASS  the chart lints cleanly with dev and prod values
+  PASS  install: revision 1 deployed
+  PASS  install: 1 replica of nginx:1.26-alpine, page says development
+  PASS  upgrade: revision 2 deployed
+  PASS  upgrade: 3 replicas of nginx:1.27-alpine, page says production
+  PASS  bad upgrade: revision 3 is marked failed
+  PASS  rollback: revision 4 deployed
+  PASS  rollback: back on nginx:1.27-alpine with 3 ready replicas
+  PASS  uninstall: nothing labelled app=notes-dev is left
+

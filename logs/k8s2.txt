@@ -1,0 +1,382 @@
+
+############################################################
+#  09.1  Pod - schedule, inspect, delete (nothing brings it back)
+############################################################
+
+kunal@kind-lab:~/devops-heros$ kubectl apply -f 09-kubernetes-workloads/manifests/01-pod.yaml
+pod/nginx-pod created
+
+kunal@kind-lab:~/devops-heros$ kubectl wait --for=condition=Ready pod/nginx-pod --timeout=120s
+pod/nginx-pod condition met
+
+kunal@kind-lab:~/devops-heros$ kubectl get pod nginx-pod -o wide
+NAME        READY   STATUS    RESTARTS   AGE   IP           NODE            NOMINATED NODE   READINESS GATES
+nginx-pod   1/1     Running   0          7s    10.244.1.4   devops-worker   <none>           <none>
+
+kunal@kind-lab:~/devops-heros$ kubectl describe pod nginx-pod | tail -20
+  PodScheduled                True 
+Volumes:
+  kube-api-access-gqz6q:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age   From               Message
+  ----    ------     ----  ----               -------
+  Normal  Scheduled  7s    default-scheduler  Successfully assigned default/nginx-pod to devops-worker
+  Normal  Pulling    7s    kubelet            spec.containers{nginx}: Pulling image "nginx:1.27-alpine"
+  Normal  Pulled     5s    kubelet            spec.containers{nginx}: Successfully pulled image "nginx:1.27-alpine" in 1.492s (1.492s including waiting). Image size: 20984244 bytes.
+  Normal  Created    5s    kubelet            spec.containers{nginx}: Container created
+  Normal  Started    5s    kubelet            spec.containers{nginx}: Container started
+
+kunal@kind-lab:~/devops-heros$ kubectl delete pod nginx-pod
+pod "nginx-pod" deleted from default namespace
+
+kunal@kind-lab:~/devops-heros$ kubectl get pods
+No resources found in default namespace.
+
+
+############################################################
+#  09.2  ReplicaSet - self-healing
+############################################################
+
+kunal@kind-lab:~/devops-heros$ kubectl apply -f 09-kubernetes-workloads/manifests/02-replicaset.yaml
+replicaset.apps/nginx-rs created
+
+kunal@kind-lab:~/devops-heros$ kubectl wait --for=jsonpath={.status.readyReplicas}=3 rs/nginx-rs --timeout=120s
+replicaset.apps/nginx-rs condition met
+
+kunal@kind-lab:~/devops-heros$ kubectl get rs nginx-rs
+NAME       DESIRED   CURRENT   READY   AGE
+nginx-rs   3         3         3       1s
+
+kunal@kind-lab:~/devops-heros$ kubectl get pods -l app=nginx-rs -o wide
+NAME             READY   STATUS    RESTARTS   AGE   IP           NODE            NOMINATED NODE   READINESS GATES
+nginx-rs-msmgd   1/1     Running   0          1s    10.244.1.6   devops-worker   <none>           <none>
+nginx-rs-r7l9q   1/1     Running   0          1s    10.244.1.5   devops-worker   <none>           <none>
+nginx-rs-s5rw4   1/1     Running   0          1s    10.244.1.7   devops-worker   <none>           <none>
+
+kunal@kind-lab:~/devops-heros$ VICTIM=$(kubectl get pod -l app=nginx-rs -o jsonpath='{.items[0].metadata.name}'); echo deleting $VICTIM; kubectl delete pod $VICTIM
+deleting nginx-rs-msmgd
+pod "nginx-rs-msmgd" deleted from default namespace
+
+kunal@kind-lab:~/devops-heros$ sleep 8; kubectl get pods -l app=nginx-rs
+NAME             READY   STATUS    RESTARTS   AGE
+nginx-rs-lclbm   1/1     Running   0          9s
+nginx-rs-r7l9q   1/1     Running   0          10s
+nginx-rs-s5rw4   1/1     Running   0          10s
+
+kunal@kind-lab:~/devops-heros$ kubectl scale rs nginx-rs --replicas=5
+replicaset.apps/nginx-rs scaled
+
+kunal@kind-lab:~/devops-heros$ sleep 8; kubectl get rs nginx-rs
+NAME       DESIRED   CURRENT   READY   AGE
+nginx-rs   5         5         5       18s
+
+kunal@kind-lab:~/devops-heros$ kubectl delete -f 09-kubernetes-workloads/manifests/02-replicaset.yaml
+replicaset.apps "nginx-rs" deleted from default namespace
+
+
+############################################################
+#  09.3  Deployment - rolling update, history, rollback
+############################################################
+
+kunal@kind-lab:~/devops-heros$ kubectl apply -f 09-kubernetes-workloads/manifests/03-deployment.yaml
+deployment.apps/nginx-deploy created
+
+kunal@kind-lab:~/devops-heros$ kubectl rollout status deploy/nginx-deploy --timeout=180s
+Waiting for deployment "nginx-deploy" rollout to finish: 0 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deploy" rollout to finish: 0 of 3 updated replicas are available...
+Waiting for deployment "nginx-deploy" rollout to finish: 1 of 3 updated replicas are available...
+Waiting for deployment "nginx-deploy" rollout to finish: 2 of 3 updated replicas are available...
+deployment "nginx-deploy" successfully rolled out
+
+kunal@kind-lab:~/devops-heros$ kubectl get deploy,rs,pods -l app=nginx-deploy
+NAME                           READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/nginx-deploy   3/3     3            3           6s
+
+NAME                                      DESIRED   CURRENT   READY   AGE
+replicaset.apps/nginx-deploy-764f96798d   3         3         3       6s
+
+NAME                                READY   STATUS    RESTARTS   AGE
+pod/nginx-deploy-764f96798d-2r2hq   1/1     Running   0          6s
+pod/nginx-deploy-764f96798d-2xh9k   1/1     Running   0          6s
+pod/nginx-deploy-764f96798d-d9q7g   1/1     Running   0          6s
+
+kunal@kind-lab:~/devops-heros$ kubectl set image deploy/nginx-deploy nginx=nginx:1.28-alpine
+deployment.apps/nginx-deploy image updated
+
+kunal@kind-lab:~/devops-heros$ kubectl rollout status deploy/nginx-deploy --timeout=180s
+Waiting for deployment "nginx-deploy" rollout to finish: 1 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deploy" rollout to finish: 1 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deploy" rollout to finish: 1 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deploy" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deploy" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deploy" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deploy" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deploy" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "nginx-deploy" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "nginx-deploy" rollout to finish: 1 old replicas are pending termination...
+deployment "nginx-deploy" successfully rolled out
+
+kunal@kind-lab:~/devops-heros$ kubectl get rs -l app=nginx-deploy
+NAME                      DESIRED   CURRENT   READY   AGE
+nginx-deploy-764f96798d   0         0         0       25s
+nginx-deploy-7ddb9b4d77   3         3         3       19s
+
+kunal@kind-lab:~/devops-heros$ kubectl rollout history deploy/nginx-deploy
+deployment.apps/nginx-deploy 
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+
+
+kunal@kind-lab:~/devops-heros$ kubectl rollout undo deploy/nginx-deploy
+Warning: resource deployments/nginx-deploy was previously managed with 'kubectl apply'. Rolling back will not update the kubectl.kubernetes.io/last-applied-configuration annotation, which may cause unexpected behavior on future 'kubectl apply' operations. Consider using 'kubectl apply' with your previous configuration file instead.
+deployment.apps/nginx-deploy rolled back
+
+kunal@kind-lab:~/devops-heros$ kubectl rollout status deploy/nginx-deploy --timeout=180s
+Waiting for deployment "nginx-deploy" rollout to finish: 1 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deploy" rollout to finish: 1 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deploy" rollout to finish: 1 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deploy" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deploy" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deploy" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deploy" rollout to finish: 2 out of 3 new replicas have been updated...
+Waiting for deployment "nginx-deploy" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "nginx-deploy" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "nginx-deploy" rollout to finish: 1 old replicas are pending termination...
+deployment "nginx-deploy" successfully rolled out
+
+kunal@kind-lab:~/devops-heros$ kubectl get deploy nginx-deploy -o jsonpath='{.spec.template.spec.containers[0].image}'; echo
+nginx:1.27-alpine
+
+
+############################################################
+#  09.4  DaemonSet - one pod per node
+############################################################
+
+kunal@kind-lab:~/devops-heros$ kubectl apply -f 09-kubernetes-workloads/manifests/04-daemonset.yaml
+daemonset.apps/node-logger created
+
+kunal@kind-lab:~/devops-heros$ sleep 10; kubectl get ds node-logger
+NAME          DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
+node-logger   2         2         2       2            2           <none>          10s
+
+kunal@kind-lab:~/devops-heros$ kubectl get pods -l app=node-logger -o wide
+NAME                READY   STATUS    RESTARTS   AGE   IP            NODE                   NOMINATED NODE   READINESS GATES
+node-logger-nf6rl   1/1     Running   0          10s   10.244.1.20   devops-worker          <none>           <none>
+node-logger-zd2c7   1/1     Running   0          10s   10.244.0.5    devops-control-plane   <none>           <none>
+
+kunal@kind-lab:~/devops-heros$ kubectl logs -l app=node-logger --tail=2
+Wed Oct  7 17:17:53 UTC 2026 logging from devops-worker
+Wed Oct  7 17:17:53 UTC 2026 logging from devops-control-plane
+
+
+############################################################
+#  09.5  StatefulSet - stable names, own volume, ordered creation
+############################################################
+
+kunal@kind-lab:~/devops-heros$ kubectl apply -f 09-kubernetes-workloads/manifests/05-statefulset.yaml
+service/web-headless created
+statefulset.apps/web created
+
+kunal@kind-lab:~/devops-heros$ kubectl rollout status sts/web --timeout=240s
+Waiting for 3 pods to be ready...
+Waiting for 2 pods to be ready...
+Waiting for 2 pods to be ready...
+Waiting for 1 pods to be ready...
+Waiting for 1 pods to be ready...
+partitioned roll out complete: 3 new pods have been updated...
+
+kunal@kind-lab:~/devops-heros$ kubectl get sts web
+NAME   READY   AGE
+web    3/3     12s
+
+kunal@kind-lab:~/devops-heros$ kubectl get pods -l app=web-sts -o wide
+NAME    READY   STATUS    RESTARTS   AGE   IP            NODE            NOMINATED NODE   READINESS GATES
+web-0   1/1     Running   0          12s   10.244.1.22   devops-worker   <none>           <none>
+web-1   1/1     Running   0          8s    10.244.1.24   devops-worker   <none>           <none>
+web-2   1/1     Running   0          4s    10.244.1.26   devops-worker   <none>           <none>
+
+kunal@kind-lab:~/devops-heros$ kubectl get pvc
+NAME         STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+data-web-0   Bound    pvc-9767dbad-147b-4264-83eb-58142fc4ea5c   100Mi      RWO            standard       <unset>                 12s
+data-web-1   Bound    pvc-89373ec5-4757-40be-966b-7503053cb879   100Mi      RWO            standard       <unset>                 8s
+data-web-2   Bound    pvc-edf63427-00ba-49f2-b5b2-c4aaa0a0dfc6   100Mi      RWO            standard       <unset>                 4s
+
+kunal@kind-lab:~/devops-heros$ kubectl exec web-0 -- sh -c 'echo I am web-0 > /usr/share/nginx/html/index.html'
+
+kunal@kind-lab:~/devops-heros$ kubectl delete pod web-0
+pod "web-0" deleted from default namespace
+
+kunal@kind-lab:~/devops-heros$ kubectl wait --for=condition=Ready pod/web-0 --timeout=180s; kubectl exec web-0 -- cat /usr/share/nginx/html/index.html
+pod/web-0 condition met
+I am web-0
+
+
+############################################################
+#  09.6  pod lifecycle - Pending, Succeeded, Failed, CrashLoop, ImagePull
+############################################################
+
+kunal@kind-lab:~/devops-heros$ kubectl apply -f 09-kubernetes-workloads/pod-lifecycle/
+pod/lifecycle-pending created
+pod/lifecycle-succeeded created
+pod/lifecycle-failed created
+pod/lifecycle-crashloop created
+pod/lifecycle-imagepull created
+pod/lifecycle-probes created
+pod/lifecycle-init created
+pod/lifecycle-sidecar created
+pod/lifecycle-termination created
+
+kunal@kind-lab:~/devops-heros$ sleep 45; kubectl get pods -l '!app' --no-headers | sort
+lifecycle-crashloop     0/1   Error              2 (40s ago)   45s
+lifecycle-failed        0/1   Error              0             45s
+lifecycle-imagepull     0/1   ImagePullBackOff   0             45s
+lifecycle-init          1/1   Running            0             45s
+lifecycle-pending       0/1   Pending            0             45s
+lifecycle-probes        1/1   Running            0             45s
+lifecycle-sidecar       2/2   Running            0             45s
+lifecycle-succeeded     0/1   Completed          0             45s
+lifecycle-termination   1/1   Running            0             45s
+
+kunal@kind-lab:~/devops-heros$ kubectl describe pod lifecycle-pending | grep -A3 Events:
+Events:
+  Type     Reason            Age                From               Message
+  ----     ------            ----               ----               -------
+  Warning  FailedScheduling  43s (x3 over 45s)  default-scheduler  0/2 nodes are available: 1 Insufficient memory, 1 node(s) had untolerated taint(s). preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling.
+
+kunal@kind-lab:~/devops-heros$ kubectl describe pod lifecycle-imagepull | grep -A5 Events:
+Events:
+  Type     Reason     Age                From               Message
+  ----     ------     ----               ----               -------
+  Normal   Scheduled  45s                default-scheduler  Successfully assigned default/lifecycle-imagepull to devops-worker
+  Normal   BackOff    17s (x2 over 44s)  kubelet            spec.containers{app}: Back-off pulling image "nginx:this-tag-does-not-exist"
+  Warning  Failed     17s (x2 over 44s)  kubelet            spec.containers{app}: Error: ImagePullBackOff
+
+kunal@kind-lab:~/devops-heros$ kubectl get pod lifecycle-crashloop -o jsonpath='{.status.containerStatuses[0].restartCount}'; echo ' restarts'
+2 restarts
+
+kunal@kind-lab:~/devops-heros$ kubectl logs lifecycle-crashloop --previous || true
+starting
+dying
+
+kunal@kind-lab:~/devops-heros$ kubectl logs lifecycle-init -c wait-for-service
+waiting for dependency
+dependency ready
+
+kunal@kind-lab:~/devops-heros$ kubectl exec lifecycle-sidecar -c server -- curl -s localhost || true
+Wed Oct  7 17:18:57 UTC 2026
+
+
+############################################################
+#  09.7  troubleshooting - three deliberately broken manifests
+############################################################
+
+kunal@kind-lab:~/devops-heros$ kubectl apply -f 09-kubernetes-workloads/troubleshooting/
+deployment.apps/broken-selector created
+service/broken-svc created
+deployment.apps/wrong-port created
+service/wrong-port-svc created
+deployment.apps/never-ready created
+
+kunal@kind-lab:~/devops-heros$ sleep 25; kubectl get svc broken-svc
+NAME         TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE
+broken-svc   ClusterIP   10.96.252.66   <none>        80/TCP    25s
+
+kunal@kind-lab:~/devops-heros$ kubectl get endpointslice -l kubernetes.io/service-name=broken-svc
+NAME               ADDRESSTYPE   PORTS     ENDPOINTS   AGE
+broken-svc-f4qrw   IPv4          <unset>   <unset>     25s
+
+kunal@kind-lab:~/devops-heros$ kubectl describe svc broken-svc | grep -i selector
+Selector:                 app=web
+
+kunal@kind-lab:~/devops-heros$ kubectl get pods --show-labels | grep -E 'broken|wrong|never'
+broken-selector-7f7fb468b8-gl9rr   1/1     Running            0             25s    app=web-v2,pod-template-hash=7f7fb468b8
+broken-selector-7f7fb468b8-mzm7m   1/1     Running            0             25s    app=web-v2,pod-template-hash=7f7fb468b8
+never-ready-6f74d5dcc8-b99pv       0/1     Running            0             25s    app=never-ready,pod-template-hash=6f74d5dcc8
+never-ready-6f74d5dcc8-tw9x5       0/1     Running            0             25s    app=never-ready,pod-template-hash=6f74d5dcc8
+wrong-port-94c78b878-zh942         1/1     Running            0             25s    app=wrong-port,pod-template-hash=94c78b878
+
+kunal@kind-lab:~/devops-heros$ kubectl get pods -l app=never-ready
+NAME                           READY   STATUS    RESTARTS   AGE
+never-ready-6f74d5dcc8-b99pv   0/1     Running   0          26s
+never-ready-6f74d5dcc8-tw9x5   0/1     Running   0          26s
+
+kunal@kind-lab:~/devops-heros$ kubectl describe pod -l app=never-ready | grep -i -A2 'readiness probe failed' | head -6
+
+
+############################################################
+#  09.8  deployment strategies
+############################################################
+
+kunal@kind-lab:~/devops-heros$ kubectl apply -f 09-kubernetes-workloads/rollout-strategies/02-blue-green.yaml
+deployment.apps/app-blue created
+deployment.apps/app-green created
+service/app-svc created
+
+kunal@kind-lab:~/devops-heros$ kubectl rollout status deploy/app-blue --timeout=180s; kubectl rollout status deploy/app-green --timeout=180s
+Waiting for deployment "app-blue" rollout to finish: 0 of 2 updated replicas are available...
+Waiting for deployment "app-blue" rollout to finish: 1 of 2 updated replicas are available...
+deployment "app-blue" successfully rolled out
+deployment "app-green" successfully rolled out
+
+kunal@kind-lab:~/devops-heros$ kubectl describe svc app-svc | grep -i selector
+Selector:                 app=demo,version=blue
+
+kunal@kind-lab:~/devops-heros$ kubectl patch svc app-svc -p '{"spec":{"selector":{"app":"demo","version":"green"}}}'
+service/app-svc patched
+
+kunal@kind-lab:~/devops-heros$ kubectl describe svc app-svc | grep -i selector
+Selector:                 app=demo,version=green
+
+kunal@kind-lab:~/devops-heros$ kubectl get endpointslice -l kubernetes.io/service-name=app-svc -o wide
+NAME            ADDRESSTYPE   PORTS   ENDPOINTS                 AGE
+app-svc-nl6p4   IPv4          80      10.244.1.42,10.244.1.44   2s
+
+
+############################################################
+#  09.9  cleanup
+############################################################
+
+kunal@kind-lab:~/devops-heros$ kubectl delete -f 09-kubernetes-workloads/rollout-strategies/02-blue-green.yaml --ignore-not-found
+deployment.apps "app-blue" deleted from default namespace
+deployment.apps "app-green" deleted from default namespace
+service "app-svc" deleted from default namespace
+
+kunal@kind-lab:~/devops-heros$ kubectl delete -f 09-kubernetes-workloads/troubleshooting/ --ignore-not-found
+deployment.apps "broken-selector" deleted from default namespace
+service "broken-svc" deleted from default namespace
+deployment.apps "wrong-port" deleted from default namespace
+service "wrong-port-svc" deleted from default namespace
+deployment.apps "never-ready" deleted from default namespace
+
+kunal@kind-lab:~/devops-heros$ kubectl delete -f 09-kubernetes-workloads/pod-lifecycle/ --ignore-not-found
+pod "lifecycle-pending" deleted from default namespace
+pod "lifecycle-succeeded" deleted from default namespace
+pod "lifecycle-failed" deleted from default namespace
+pod "lifecycle-crashloop" deleted from default namespace
+pod "lifecycle-imagepull" deleted from default namespace
+pod "lifecycle-probes" deleted from default namespace
+pod "lifecycle-init" deleted from default namespace
+pod "lifecycle-sidecar" deleted from default namespace
+pod "lifecycle-termination" deleted from default namespace
+
+kunal@kind-lab:~/devops-heros$ kubectl delete -f 09-kubernetes-workloads/manifests/ --ignore-not-found
+deployment.apps "nginx-deploy" deleted from default namespace
+daemonset.apps "node-logger" deleted from default namespace
+service "web-headless" deleted from default namespace
+statefulset.apps "web" deleted from default namespace
+
+kunal@kind-lab:~/devops-heros$ kubectl delete pvc --all
+persistentvolumeclaim "data-web-0" deleted from default namespace
+persistentvolumeclaim "data-web-1" deleted from default namespace
+persistentvolumeclaim "data-web-2" deleted from default namespace
+

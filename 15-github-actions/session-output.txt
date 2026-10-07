@@ -1,0 +1,209 @@
+Session 16: CI/CD with GitHub Actions - output from the real pipeline runs
+==========================================================================
+Repository kunalKumar-13/devops-heros, workflow .github/workflows/session16-cicd.yml.
+Taken from the GitHub Actions job logs (timestamps removed). Only the steps that
+run commands are shown; the setup output of actions such as actions/checkout is left out.
+
+Run 1: the failure scenario. add() was changed to return a + b + 1 on purpose.
+Run 2: the fix. add() restored; every job passes and the build is released.
+
+
+##############################################################################
+#  RUN 1: commit 812da7b "Session 16 failure scenario: break add() on purpose"  ->  FAILED
+#  https://github.com/kunalKumar-13/devops-heros/actions/runs/37655965208
+##############################################################################
+
+  failure   Test (ubuntu-latest, Python 3.11)
+  failure   Test (ubuntu-latest, Python 3.12)
+  failure   Test (ubuntu-latest, Python 3.13)
+  failure   Test (windows-latest, Python 3.11)
+  failure   Test (windows-latest, Python 3.12)
+  failure   Test (windows-latest, Python 3.13)
+  skipped   Build            (needs: test)
+  skipped   Security check   (needs: test)
+  skipped   Release          (needs: [build, security-check])
+
+------------------------------------------------------------------------------
+JOB: Test (ubuntu-latest, Python 3.12)
+------------------------------------------------------------------------------
+
+$ echo "runner os   : $RUNNER_OS ($RUNNER_ARCH)"
+  echo "runner name : $RUNNER_NAME"
+  python --version
+runner os   : Linux (X64)
+runner name : GitHub Actions 1000002011
+Python 3.12.15
+
+$ pytest --cov=app --cov-report=term-missing
+============================= test session starts ==============================
+platform linux -- Python 3.12.15, pytest-8.3.4, pluggy-1.6.0 -- /opt/hostedtoolcache/Python/3.12.15/x64/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/devops-heros/devops-heros/15-github-actions
+configfile: pytest.ini
+testpaths: tests
+plugins: cov-6.0.0
+collecting ... collected 6 items
+tests/test_calculator.py::test_add FAILED                                [ 16%]
+tests/test_calculator.py::test_subtract PASSED                           [ 33%]
+tests/test_calculator.py::test_multiply PASSED                           [ 50%]
+tests/test_calculator.py::test_divide PASSED                             [ 66%]
+tests/test_calculator.py::test_divide_by_zero_is_rejected PASSED         [ 83%]
+tests/test_calculator.py::test_percentage PASSED                         [100%]
+=================================== FAILURES ===================================
+___________________________________ test_add ___________________________________
+    def test_add():
+>       assert add(2, 3) == 5
+E       assert 6 == 5
+E        +  where 6 = add(2, 3)
+tests/test_calculator.py:7: AssertionError
+---------- coverage: platform linux, python 3.12.15-final-0 ----------
+Name                Stmts   Miss  Cover   Missing
+-------------------------------------------------
+app/__init__.py         0      0   100%
+app/calculator.py      12      0   100%
+-------------------------------------------------
+TOTAL                  12      0   100%
+=========================== short test summary info ============================
+FAILED tests/test_calculator.py::test_add - assert 6 == 5
+ +  where 6 = add(2, 3)
+========================= 1 failed, 5 passed in 0.05s ==========================
+ERROR: Process completed with exit code 1.
+
+
+##############################################################################
+#  RUN 2: commit 34a5263 "Fix application"  ->  PASSED
+#  https://github.com/kunalKumar-13/devops-heros/actions/runs/37656285098
+##############################################################################
+
+  success   Test (ubuntu-latest, Python 3.11)
+  success   Test (ubuntu-latest, Python 3.12)
+  success   Test (ubuntu-latest, Python 3.13)
+  success   Test (windows-latest, Python 3.11)
+  success   Test (windows-latest, Python 3.12)
+  success   Test (windows-latest, Python 3.13)
+  success   Build
+  success   Security check
+  success   Release
+
+------------------------------------------------------------------------------
+JOB: Test (ubuntu-latest, Python 3.12)
+------------------------------------------------------------------------------
+
+$ echo "runner os   : $RUNNER_OS ($RUNNER_ARCH)"
+  echo "runner name : $RUNNER_NAME"
+  python --version
+runner os   : Linux (X64)
+runner name : GitHub Actions 1000002018
+Python 3.12.14
+
+$ pytest --cov=app --cov-report=term-missing
+============================= test session starts ==============================
+platform linux -- Python 3.12.14, pytest-8.3.4, pluggy-1.6.0 -- /opt/hostedtoolcache/Python/3.12.14/x64/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/devops-heros/devops-heros/15-github-actions
+configfile: pytest.ini
+testpaths: tests
+plugins: cov-6.0.0
+collecting ... collected 6 items
+tests/test_calculator.py::test_add PASSED                                [ 16%]
+tests/test_calculator.py::test_subtract PASSED                           [ 33%]
+tests/test_calculator.py::test_multiply PASSED                           [ 50%]
+tests/test_calculator.py::test_divide PASSED                             [ 66%]
+tests/test_calculator.py::test_divide_by_zero_is_rejected PASSED         [ 83%]
+tests/test_calculator.py::test_percentage PASSED                         [100%]
+---------- coverage: platform linux, python 3.12.14-final-0 ----------
+Name                Stmts   Miss  Cover   Missing
+-------------------------------------------------
+app/__init__.py         0      0   100%
+app/calculator.py      18      5    72%   28-32
+-------------------------------------------------
+TOTAL                  18      5    72%
+============================== 6 passed in 0.03s ===============================
+
+------------------------------------------------------------------------------
+JOB: Test (windows-latest, Python 3.12)
+------------------------------------------------------------------------------
+
+$ echo "runner os   : $RUNNER_OS ($RUNNER_ARCH)"
+  echo "runner name : $RUNNER_NAME"
+  python --version
+runner os   : Windows (X64)
+runner name : GitHub Actions 1000002019
+Python 3.12.10
+
+$ pytest --cov=app --cov-report=term-missing
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-8.3.4, pluggy-1.6.0 -- C:\hostedtoolcache\windows\Python\3.12.10\x64\python.exe
+cachedir: .pytest_cache
+rootdir: D:\a\devops-heros\devops-heros\15-github-actions
+configfile: pytest.ini
+testpaths: tests
+plugins: cov-6.0.0
+collecting ... collected 6 items
+tests/test_calculator.py::test_add PASSED                                [ 16%]
+tests/test_calculator.py::test_subtract PASSED                           [ 33%]
+tests/test_calculator.py::test_multiply PASSED                           [ 50%]
+tests/test_calculator.py::test_divide PASSED                             [ 66%]
+tests/test_calculator.py::test_divide_by_zero_is_rejected PASSED         [ 83%]
+tests/test_calculator.py::test_percentage PASSED                         [100%]
+---------- coverage: platform win32, python 3.12.10-final-0 ----------
+Name                Stmts   Miss  Cover   Missing
+-------------------------------------------------
+app\__init__.py         0      0   100%
+app\calculator.py      18      5    72%   28-32
+-------------------------------------------------
+TOTAL                  18      5    72%
+============================== 6 passed in 0.16s ==============================
+
+------------------------------------------------------------------------------
+JOB: Build
+------------------------------------------------------------------------------
+
+$ bash build.sh
+built dist/calculator-34a5263.tar.gz
+name: calculator
+version: 34a5263
+built_at: 2026-10-07T17:05:49Z
+built_by: kunalKumar-13
+runner: Linux
+
+------------------------------------------------------------------------------
+JOB: Security check
+------------------------------------------------------------------------------
+
+$ found=$(find .. -path ../.git -prune -o -type f \( -name ".env" -o -name "*.pem" -o -name "*.key" -o -name "id_rsa" \) -print)
+  if [ -n "$found" ]; then
+    echo "sensitive files found:"; echo "$found"; exit 1
+  fi
+  echo "no .env, .pem, .key or private-key files in the repository"
+no .env, .pem, .key or private-key files in the repository
+
+$ if grep -rniE "(password|secret|api_key|token)\s*=\s*['\"][^'\"]+['\"]" app/; then
+    echo "possible hard-coded credential"; exit 1
+  fi
+  echo "no hard-coded credentials in app/"
+no hard-coded credentials in app/
+
+------------------------------------------------------------------------------
+JOB: Release
+------------------------------------------------------------------------------
+
+$ ls -l dist
+  cat dist/build-info.txt
+total 8
+-rw-r--r-- 1 runner runner 103 Oct  7 17:06 build-info.txt
+-rw-r--r-- 1 runner runner 566 Oct  7 17:06 calculator-34a5263.tar.gz
+name: calculator
+version: 34a5263
+built_at: 2026-10-07T17:05:49Z
+built_by: kunalKumar-13
+runner: Linux
+
+$ if [ -z "$RELEASE_NOTE" ]; then
+    echo "RELEASE_NOTE secret is not set"; exit 1
+  fi
+  echo "the secret is available to this step (${#RELEASE_NOTE} characters)"
+  echo "printing it directly is masked by GitHub: $RELEASE_NOTE"
+the secret is available to this step (63 characters)
+printing it directly is masked by GitHub: ***
+Cleaning up orphan processes

@@ -20,7 +20,16 @@ from the terminal on **Ubuntu 26.04** as `kunal@kunal-devops`.
 
 ## Kubernetes sections (08-11)
 
-Those sections have no captured logs yet. The tooling to produce them lives here:
+| File | Section |
+|---|---|
+| `k8s1.txt` | 08: the cluster, its nodes, the control plane as pods, the API resources |
+| `k8s2.txt` | 09: Pod, ReplicaSet, Deployment, DaemonSet, StatefulSet, lifecycle, broken manifests, strategies |
+| `k8s3.txt` | 10: every Service type, zero endpoints, headless, DNS |
+| `k8s4.txt` | 11: ConfigMap, Secret, path- and host-based Ingress, 404 vs 503 |
+
+These were recorded on a 2-node kind cluster in GitHub Actions (the `kubernetes` job in
+[`sessions-lab.yml`](../.github/workflows/sessions-lab.yml)), not on the VM above.
+The tooling:
 
 | File | What it does |
 |---|---|

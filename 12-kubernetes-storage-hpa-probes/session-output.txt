@@ -1,0 +1,217 @@
+
+############################################################
+#  1. Storage classes available in this cluster
+############################################################
+
+kunal@kind-lab:~$ kubectl get storageclass
+NAME                 PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+standard (default)   rancher.io/local-path   Delete          WaitForFirstConsumer   false                  6m29s
+
+
+############################################################
+#  2. emptyDir: two containers in one pod share a scratch volume
+############################################################
+
+kunal@kind-lab:~$ kubectl apply -f manifests/01-namespace.yaml
+namespace/production-webapp created
+
+kunal@kind-lab:~$ kubectl apply -f manifests/06-emptydir-pod.yaml
+pod/emptydir-demo created
+
+kunal@kind-lab:~$ kubectl wait --for=condition=Ready pod/emptydir-demo -n production-webapp --timeout=120s
+pod/emptydir-demo condition met
+
+>>> the reader container sees the file the writer container created
+
+kunal@kind-lab:~$ kubectl exec -n production-webapp emptydir-demo -c reader -- cat /shared/msg
+written-by-writer
+
+
+############################################################
+#  3. PersistentVolumeClaim, dynamically provisioned
+############################################################
+
+kunal@kind-lab:~$ kubectl apply -f manifests/02-pvc.yaml
+persistentvolumeclaim/web-data created
+
+kunal@kind-lab:~$ kubectl get pvc -n production-webapp
+NAME       STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+web-data   Pending                                      standard       <unset>                 0s
+
+>>> WaitForFirstConsumer: the claim stays Pending until a pod uses it, so the volume is created on the node that pod lands on
+
+
+############################################################
+#  4. Deployment (2 replicas, probes, PVC at /data) and Service
+############################################################
+
+kunal@kind-lab:~$ kubectl apply -f manifests/03-deployment.yaml
+deployment.apps/web-app created
+
+kunal@kind-lab:~$ kubectl apply -f manifests/04-service.yaml
+service/web-app created
+
+kunal@kind-lab:~$ kubectl rollout status deployment/web-app -n production-webapp --timeout=240s
+Waiting for deployment "web-app" rollout to finish: 0 of 2 updated replicas are available...
+Waiting for deployment "web-app" rollout to finish: 1 of 2 updated replicas are available...
+deployment "web-app" successfully rolled out
+
+kunal@kind-lab:~$ kubectl get pods -n production-webapp -l app=web-app -o wide
+NAME                       READY   STATUS    RESTARTS   AGE   IP            NODE            NOMINATED NODE   READINESS GATES
+web-app-66d887d887-ftfss   1/1     Running   0          15s   10.244.1.66   devops-worker   <none>           <none>
+web-app-66d887d887-qgv2k   1/1     Running   0          15s   10.244.1.65   devops-worker   <none>           <none>
+
+kunal@kind-lab:~$ kubectl get pvc -n production-webapp
+NAME       STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+web-data   Bound    pvc-c00623ea-3e60-4c02-9009-30c60ac44385   500Mi      RWO            standard       <unset>                 15s
+
+kunal@kind-lab:~$ kubectl get pv
+NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                        STORAGECLASS   VOLUMEATTRIBUTESCLASS   REASON   AGE
+pvc-c00623ea-3e60-4c02-9009-30c60ac44385   500Mi      RWO            Delete           Bound    production-webapp/web-data   standard       <unset>                          12s
+
+>>> the claim is now Bound to a PersistentVolume created for it
+
+
+############################################################
+#  5. Probes, as Kubernetes sees them
+############################################################
+
+kunal@kind-lab:~$ kubectl describe pod -n production-webapp -l app=web-app | grep -E '^Name:|Liveness|Readiness|Startup' | head -8
+Name:             web-app-66d887d887-ftfss
+    Liveness:     http-get http://:80/ delay=0s timeout=1s period=10s successThreshold=1 failureThreshold=3
+    Readiness:    http-get http://:80/ delay=0s timeout=1s period=5s successThreshold=1 failureThreshold=3
+    Startup:      http-get http://:80/ delay=0s timeout=1s period=5s successThreshold=1 failureThreshold=12
+Name:             web-app-66d887d887-qgv2k
+    Liveness:     http-get http://:80/ delay=0s timeout=1s period=10s successThreshold=1 failureThreshold=3
+    Readiness:    http-get http://:80/ delay=0s timeout=1s period=5s successThreshold=1 failureThreshold=3
+    Startup:      http-get http://:80/ delay=0s timeout=1s period=5s successThreshold=1 failureThreshold=12
+
+
+############################################################
+#  6. Task 1: data on the PVC survives the pod being deleted
+############################################################
+
+kunal@kind-lab:~$ kubectl exec -n production-webapp web-app-66d887d887-ftfss -- sh -c 'echo "Student: Kunal Kumar (24BCS10027)" > /data/student.txt'
+
+kunal@kind-lab:~$ kubectl exec -n production-webapp web-app-66d887d887-ftfss -- cat /data/student.txt
+Student: Kunal Kumar (24BCS10027)
+
+kunal@kind-lab:~$ kubectl delete pod -n production-webapp web-app-66d887d887-ftfss
+pod "web-app-66d887d887-ftfss" deleted from production-webapp namespace
+
+kunal@kind-lab:~$ kubectl rollout status deployment/web-app -n production-webapp --timeout=180s
+Waiting for deployment "web-app" rollout to finish: 1 of 2 updated replicas are available...
+deployment "web-app" successfully rolled out
+
+>>> old pod: web-app-66d887d887-ftfss   new pod: web-app-66d887d887-qgv2k
+
+kunal@kind-lab:~$ kubectl exec -n production-webapp web-app-66d887d887-qgv2k -- cat /data/student.txt
+Student: Kunal Kumar (24BCS10027)
+
+
+############################################################
+#  7. Task 2: the Service answers
+############################################################
+
+kunal@kind-lab:~$ kubectl run curl-svc -n production-webapp --rm -i -q --restart=Never --image=curlimages/curl:8.10.1 -- curl -s http://web-app.production-webapp.svc.cluster.local/
+OK!
+kunal@kind-lab:~$ kubectl get endpoints web-app -n production-webapp
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+NAME      ENDPOINTS                       AGE
+web-app   10.244.1.65:80,10.244.1.67:80   23s
+
+
+############################################################
+#  8. Task 3: HPA scales out under load
+############################################################
+
+kunal@kind-lab:~$ kubectl apply -f manifests/05-hpa.yaml
+horizontalpodautoscaler.autoscaling/web-app-hpa created
+
+>>> waiting for Metrics Server to report CPU for the pods
+
+kunal@kind-lab:~$ kubectl get hpa -n production-webapp
+NAME          REFERENCE            TARGETS       MINPODS   MAXPODS   REPLICAS   AGE
+web-app-hpa   Deployment/web-app   cpu: 1%/50%   2         5         2          30s
+
+>>> starting 4 load generators that request the CPU-heavy page in a loop
+
+kunal@kind-lab:~$ kubectl get hpa -n production-webapp   # t+10s
+web-app-hpa   Deployment/web-app   cpu: 1%/50%   2     5     2     30s
+kunal@kind-lab:~$ kubectl get hpa -n production-webapp   # t+20s
+web-app-hpa   Deployment/web-app   cpu: 1%/50%   2     5     2     40s
+kunal@kind-lab:~$ kubectl get hpa -n production-webapp   # t+30s
+web-app-hpa   Deployment/web-app   cpu: 12%/50%   2     5     2     50s
+kunal@kind-lab:~$ kubectl get hpa -n production-webapp   # t+40s
+web-app-hpa   Deployment/web-app   cpu: 195%/50%   2     5     2     61s
+kunal@kind-lab:~$ kubectl get hpa -n production-webapp   # t+50s
+web-app-hpa   Deployment/web-app   cpu: 195%/50%   2     5     2     71s
+kunal@kind-lab:~$ kubectl get hpa -n production-webapp   # t+60s
+web-app-hpa   Deployment/web-app   cpu: 228%/50%   2     5     4     81s
+kunal@kind-lab:~$ kubectl get hpa -n production-webapp   # t+70s
+web-app-hpa   Deployment/web-app   cpu: 236%/50%   2     5     5     91s
+kunal@kind-lab:~$ kubectl get hpa -n production-webapp   # t+80s
+web-app-hpa   Deployment/web-app   cpu: 236%/50%   2     5     5     101s
+kunal@kind-lab:~$ kubectl get hpa -n production-webapp   # t+90s
+web-app-hpa   Deployment/web-app   cpu: 190%/50%   2     5     5     111s
+kunal@kind-lab:~$ kubectl get hpa -n production-webapp   # t+100s
+web-app-hpa   Deployment/web-app   cpu: 171%/50%   2     5     5     2m1s
+kunal@kind-lab:~$ kubectl get hpa -n production-webapp   # t+110s
+web-app-hpa   Deployment/web-app   cpu: 171%/50%   2     5     5     2m11s
+kunal@kind-lab:~$ kubectl get hpa -n production-webapp   # t+120s
+web-app-hpa   Deployment/web-app   cpu: 168%/50%   2     5     5     2m21s
+kunal@kind-lab:~$ kubectl get hpa -n production-webapp   # t+130s
+web-app-hpa   Deployment/web-app   cpu: 164%/50%   2     5     5     2m31s
+kunal@kind-lab:~$ kubectl get hpa -n production-webapp   # t+140s
+web-app-hpa   Deployment/web-app   cpu: 164%/50%   2     5     5     2m41s
+kunal@kind-lab:~$ kubectl get hpa -n production-webapp   # t+150s
+web-app-hpa   Deployment/web-app   cpu: 176%/50%   2     5     5     2m51s
+kunal@kind-lab:~$ kubectl get hpa -n production-webapp   # t+160s
+web-app-hpa   Deployment/web-app   cpu: 163%/50%   2     5     5     3m2s
+kunal@kind-lab:~$ kubectl get hpa -n production-webapp   # t+170s
+web-app-hpa   Deployment/web-app   cpu: 163%/50%   2     5     5     3m12s
+kunal@kind-lab:~$ kubectl get hpa -n production-webapp   # t+180s
+web-app-hpa   Deployment/web-app   cpu: 174%/50%   2     5     5     3m22s
+
+kunal@kind-lab:~$ kubectl get deployment web-app -n production-webapp
+NAME      READY   UP-TO-DATE   AVAILABLE   AGE
+web-app   5/5     5            5           3m57s
+
+kunal@kind-lab:~$ kubectl get pods -n production-webapp -l app=web-app
+NAME                       READY   STATUS    RESTARTS   AGE
+web-app-66d887d887-82h2c   1/1     Running   0          2m32s
+web-app-66d887d887-kb9gt   1/1     Running   0          2m17s
+web-app-66d887d887-pgn5x   1/1     Running   0          2m32s
+web-app-66d887d887-qgv2k   1/1     Running   0          3m57s
+web-app-66d887d887-z6v8l   1/1     Running   0          3m42s
+
+kunal@kind-lab:~$ kubectl describe hpa web-app-hpa -n production-webapp | sed -n '/Events:/,$p'
+Events:
+  Type     Reason                        Age    From                       Message
+  ----     ------                        ----   ----                       -------
+  Warning  FailedGetResourceMetric       3m32s  horizontal-pod-autoscaler  failed to get cpu utilization: unable to get metrics for resource cpu: no metrics returned from resource metrics API
+  Warning  FailedComputeMetricsReplicas  3m32s  horizontal-pod-autoscaler  invalid metrics (1 invalid out of 1), first error is: failed to get cpu resource metric value: failed to get cpu utilization: unable to get metrics for resource cpu: no metrics returned from resource metrics API
+  Warning  FailedGetResourceMetric       3m17s  horizontal-pod-autoscaler  failed to get cpu utilization: did not receive metrics for targeted pods (pods might be unready)
+  Warning  FailedComputeMetricsReplicas  3m17s  horizontal-pod-autoscaler  invalid metrics (1 invalid out of 1), first error is: failed to get cpu resource metric value: failed to get cpu utilization: did not receive metrics for targeted pods (pods might be unready)
+  Normal   SuccessfulRescale             2m32s  horizontal-pod-autoscaler  New size: 4; reason: cpu resource utilization (percentage of request) above target
+  Normal   SuccessfulRescale             2m17s  horizontal-pod-autoscaler  New size: 5; reason: cpu resource utilization (percentage of request) above target
+
+kunal@kind-lab:~$ kubectl delete pod load -n production-webapp --wait=false
+pod "load" deleted from production-webapp namespace
+
+
+############################################################
+#  Verified results: 10 passed, 0 failed
+############################################################
+
+  PASS  emptyDir: the reader container sees the writer's file
+  PASS  PVC web-data is Bound to a dynamically provisioned volume
+  PASS  web-app has 2 ready replicas
+  PASS  startup, readiness and liveness probes are all configured
+  PASS  a new pod replaced the deleted one
+  PASS  the data written before the pod was deleted is still there
+  PASS  the Service has endpoints
+  PASS  the Service answers HTTP requests
+  PASS  the HPA reads CPU metrics (not <unknown>)
+  PASS  the HPA scaled web-app above its minimum of 2 (peak: 5 replicas)
+

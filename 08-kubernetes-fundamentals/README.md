@@ -3,12 +3,10 @@
 Assignment: read the [Kubernetes architecture docs](https://kubernetes.io/docs/concepts/architecture/)
 and write up what a cluster is actually made of.
 
-> **Evidence note** — this section is a written assignment, so there is nothing to
-> capture beyond the cluster coming up. Sections 01–07 of this branch carry captured
-> terminal output and screenshots from a live Ubuntu VM; the Kubernetes sections do not
-> yet, and nothing in them is presented as captured output. Bring up the cluster with
-> [§5](#5-lab-environment-used-for-sections-0911) below and run
-> [`logs/capture-k8s.sh`](../logs/capture-k8s.sh) `1` to record it into `logs/k8s1.txt`.
+> **Evidence.** Run on a real cluster (kind, 2 nodes) in GitHub Actions by
+> [`logs/capture-k8s.sh`](../logs/capture-k8s.sh) `1`, which prints each command before its
+> output. The full, unedited transcript is [`logs/k8s1.txt`](../logs/k8s1.txt): the cluster coming up, its nodes, the control plane running as pods in kube-system, and every kind of object the API server knows about.
+> Run: <https://github.com/kunalKumar-13/devops-heros/actions/runs/37657639033>
 
 ---
 

@@ -6,14 +6,10 @@ Headless — plus how in-cluster DNS resolves them.
 One shared backend ([`00-backend-deployment.yaml`](00-backend-deployment.yaml), 3 pods of
 `echoserver`, which prints the pod name it answered from) sits behind all five.
 
-> **Evidence note** — sections 01–07 carry captured terminal output and screenshots
-> from a live Ubuntu VM. These Kubernetes sections do **not** yet: the write-up and
-> the manifests are complete and applied-tested for schema, but no cluster run is
-> recorded here, and nothing below is presented as captured output. To produce that
-> evidence, bring up the cluster from
-> [section 08 §5](../08-kubernetes-fundamentals/#5-lab-environment-used-for-sections-0911)
-> and run [`logs/capture-k8s.sh`](../logs/capture-k8s.sh) `3` — it runs every command
-> in this section and writes the transcript to `logs/k8s3.txt`.
+> **Evidence.** Run on a real cluster (kind, 2 nodes) in GitHub Actions by
+> [`logs/capture-k8s.sh`](../logs/capture-k8s.sh) `3`, which prints each command before its
+> output. The full, unedited transcript is [`logs/k8s3.txt`](../logs/k8s3.txt): every command in this section: ClusterIP load-balancing across pods, a Service with zero endpoints, NodePort, LoadBalancer, ExternalName, a headless Service and Service DNS.
+> Run: <https://github.com/kunalKumar-13/devops-heros/actions/runs/37657639033>
 
 ---
 

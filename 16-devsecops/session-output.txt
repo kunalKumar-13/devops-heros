@@ -1,0 +1,357 @@
+Session 17: DevSecOps - output from the real pipeline runs
+==========================================================
+Repository kunalKumar-13/devops-heros, workflow .github/workflows/session17-devsecops.yml.
+Taken from the GitHub Actions job logs (timestamps removed). Only the steps that
+run commands are shown. Where output was long (docker build, Trivy's per-package
+CVE tables) it is cut, and every cut is marked with [... n lines omitted ...].
+
+Run 1: the first run. The secret scan found a password in the history and stopped
+       the pipeline before anything was built or pushed.
+Run 2: after the fix (commit a3081c8) and the later smoke-test change: every gate
+       passes, the scanned image is pushed to GHCR and deployed to Kubernetes.
+
+
+##############################################################################
+#  RUN 1: commit 22f1b7b  ->  FAILED at the secret scan
+#  https://github.com/kunalKumar-13/devops-heros/actions/runs/37651413890
+##############################################################################
+
+  success   Unit tests
+  success   SAST (CodeQL + Bandit)
+  success   SCA (pip-audit)
+  failure   Secret scanning (gitleaks)
+  skipped   Build and scan the image     (needs: sast, sca, secrets)
+  skipped   Push to GHCR
+  skipped   Deploy to Kubernetes (kind)
+
+------------------------------------------------------------------------------
+JOB: Secret scanning (gitleaks)
+------------------------------------------------------------------------------
+
+$ curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz | tar -xz gitleaks
+  ./gitleaks git --redact --verbose --exit-code 1 .
+    ○
+    │╲
+    │ ○
+    ○ ░
+    ░    gitleaks
+Finding:     runsh "curl -s localhost:3000/api/health"
+runsh "curl -s -u                 REDACTED localhost:3000/api/datasources | python3 -c \"import json,sys; [print(d['name'], d['type'], d['url']) for d in json.load(sys.stdin)]\""
+runsh "curl -s -u REDACTED                                                                                                               'localhost:3000/api...
+Secret:      REDACTED
+RuleID:      curl-auth-user
+Entropy:     3.500000
+File:        19-monitoring-observability-gitops/monitoring-lab.sh
+Line:        36
+Commit:      df0935713336bbfca581d76683f6f4a7433b57b2
+Author:      kunalKumar-13
+Email:       kunalsain0324@gmail.com
+Date:        2026-10-07T16:21:32Z
+Fingerprint: df0935713336bbfca581d76683f6f4a7433b57b2:19-monitoring-observability-gitops/monitoring-lab.sh:curl-auth-user:36
+Link:        https://github.com/kunalKumar-13/devops-heros/blob/df0935713336bbfca581d76683f6f4a7433b57b2/19-monitoring-observability-gitops/monitoring-lab.sh#L36-L38
+4:22PM INF 52 commits scanned.
+4:22PM INF scanned ~5733854 bytes (5.73 MB) in 341ms
+4:22PM WRN leaks found: 1
+ERROR: Process completed with exit code 1.
+
+
+##############################################################################
+#  RUN 2: commit b202ae8  ->  PASSED, image pushed and deployed
+#  https://github.com/kunalKumar-13/devops-heros/actions/runs/37656475701
+##############################################################################
+
+  success   Unit tests
+  success   SAST (CodeQL + Bandit)
+  success   SCA (pip-audit)
+  success   Secret scanning (gitleaks)
+  success   Build and scan the image
+  success   Push to GHCR
+  success   Deploy to Kubernetes (kind)
+
+------------------------------------------------------------------------------
+JOB: Unit tests
+------------------------------------------------------------------------------
+
+$ pytest
+============================= test session starts ==============================
+platform linux -- Python 3.12.15, pytest-8.3.4, pluggy-1.6.0 -- /opt/hostedtoolcache/Python/3.12.15/x64/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/devops-heros/devops-heros/16-devsecops
+configfile: pytest.ini
+testpaths: tests
+plugins: platformdirs-4.12.3
+collecting ... collected 5 items
+tests/test_app.py::test_health PASSED                                    [ 20%]
+tests/test_app.py::test_greet_default PASSED                             [ 40%]
+tests/test_app.py::test_greet_name_is_trimmed_and_capped PASSED          [ 60%]
+tests/test_app.py::test_add PASSED                                       [ 80%]
+tests/test_app.py::test_add_rejects_bad_input PASSED                     [100%]
+============================== 5 passed in 0.12s ===============================
+
+------------------------------------------------------------------------------
+JOB: SAST (CodeQL + Bandit)  [CodeQL's own log is not reproduced; its results are in the repository's Security tab]
+------------------------------------------------------------------------------
+
+$ pip install -q bandit==1.9.4
+  bandit -r app -ll -f txt
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+[main]	INFO	running on Python 3.12.14
+[tester]	WARNING	nosec encountered (B104), but no failed test on file app/main.py:36
+[tester]	WARNING	nosec encountered (B104), but no failed test on file app/main.py:36
+Run started:2026-10-07 17:07:32.131839+00:00
+Test results:
+	No issues identified.
+Code scanned:
+	Total lines of code: 24
+	Total lines skipped (#nosec): 0
+	Total potential issues skipped due to specifically being disabled (e.g., #nosec BXXX): 1
+Run metrics:
+	Total issues (by severity):
+		Undefined: 0
+		Low: 0
+		Medium: 0
+		High: 0
+	Total issues (by confidence):
+		Undefined: 0
+		Low: 0
+		Medium: 0
+		High: 0
+Files skipped (0):
+
+------------------------------------------------------------------------------
+JOB: SCA (pip-audit)
+------------------------------------------------------------------------------
+
+$ pip install -q pip-audit==2.10.1
+  pip-audit -r requirements.txt --strict --desc
+No known vulnerabilities found
+
+------------------------------------------------------------------------------
+JOB: Secret scanning (gitleaks)
+------------------------------------------------------------------------------
+
+$ curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz | tar -xz gitleaks
+  ./gitleaks git --redact --verbose --exit-code 1 .
+    ○
+    │╲
+    │ ○
+    ○ ░
+    ░    gitleaks
+5:06PM INF 61 commits scanned.
+5:06PM INF scanned ~5754843 bytes (5.75 MB) in 381ms
+5:06PM INF no leaks found
+
+------------------------------------------------------------------------------
+JOB: Build and scan the image
+------------------------------------------------------------------------------
+
+$ docker build --build-arg APP_VERSION=${GITHUB_SHA::12} -t ghcr.io/kunalkumar-13/secure-api:b202ae83e8a4 .
+#0 building with "default" instance using docker driver
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 611B 0.0s done
+#1 DONE 0.0s
+#2 [auth] library/python:pull token for registry-1.docker.io
+#2 DONE 0.0s
+#3 [internal] load metadata for docker.io/library/python:3.12-slim
+#3 DONE 0.6s
+[... 52 lines omitted ...]
+#10 1.110 Collecting blinker>=1.9.0 (from flask==3.1.3->-r requirements.txt (line 1))
+#10 1.113   Downloading blinker-1.9.0-py3-none-any.whl.metadata (1.6 kB)
+#10 1.124 Collecting click>=8.1.3 (from flask==3.1.3->-r requirements.txt (line 1))
+#10 1.127   Downloading click-8.5.0-py3-none-any.whl.metadata (2.6 kB)
+#10 1.133 Collecting itsdangerous>=2.2.0 (from flask==3.1.3->-r requirements.txt (line 1))
+#10 1.136   Downloading itsdangerous-2.2.0-py3-none-any.whl.metadata (1.9 kB)
+#10 1.144 Collecting jinja2>=3.1.2 (from flask==3.1.3->-r requirements.txt (line 1))
+#10 1.147   Downloading jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+#10 1.183 Collecting markupsafe>=2.1.1 (from flask==3.1.3->-r requirements.txt (line 1))
+#10 1.186   Downloading markupsafe-3.0.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.7 kB)
+#10 1.199 Collecting werkzeug>=3.1.0 (from flask==3.1.3->-r requirements.txt (line 1))
+#10 1.202   Downloading werkzeug-3.1.9-py3-none-any.whl.metadata (4.1 kB)
+#10 1.209 Downloading flask-3.1.3-py3-none-any.whl (103 kB)
+#10 1.214 Downloading gunicorn-26.2.0-py3-none-any.whl (228 kB)
+#10 1.219 Downloading blinker-1.9.0-py3-none-any.whl (8.5 kB)
+#10 1.222 Downloading click-8.5.0-py3-none-any.whl (125 kB)
+#10 1.225 Downloading itsdangerous-2.2.0-py3-none-any.whl (16 kB)
+#10 1.228 Downloading jinja2-3.1.6-py3-none-any.whl (134 kB)
+#10 1.231 Downloading markupsafe-3.0.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (22 kB)
+#10 1.234 Downloading werkzeug-3.1.9-py3-none-any.whl (228 kB)
+#10 1.249 Installing collected packages: markupsafe, itsdangerous, gunicorn, click, blinker, werkzeug, jinja2, flask
+#10 1.645 Successfully installed blinker-1.9.0 click-8.5.0 flask-3.1.3 gunicorn-26.2.0 itsdangerous-2.2.0 jinja2-3.1.6 markupsafe-3.0.4 werkzeug-3.1.9
+#10 1.645 WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+#10 1.714 
+#10 1.714 [notice] A new release of pip is available: 25.0.1 -> 26.2.1
+#10 1.714 [notice] To update, run: pip install --upgrade pip
+#10 DONE 1.8s
+#11 [6/7] COPY app ./app
+#11 DONE 0.0s
+#12 [7/7] RUN useradd --uid 10001 --no-create-home appuser
+#12 DONE 0.1s
+#13 exporting to image
+#13 exporting layers
+#13 exporting layers 0.5s done
+#13 writing image sha256:ac3d7a033d782c336dca2ef15a2cd73ec11469d8c940951349394733ac51169a done
+#13 naming to ghcr.io/kunalkumar-13/secure-api:b202ae83e8a4 done
+#13 DONE 0.5s
+
+$ trivy image <image>   # step 'Trivy report': all severities, exit-code 0 (never fails)
+Running Trivy with options: trivy image ghcr.io/kunalkumar-13/secure-api:b202ae83e8a4
+2026-10-07T17:08:03Z	INFO	[vuln] Vulnerability scanning is enabled
+2026-10-07T17:08:03Z	INFO	[secret] Secret scanning is enabled
+2026-10-07T17:08:03Z	INFO	[secret] If your scanning is slow, please try '--scanners vuln' to disable secret scanning
+2026-10-07T17:08:03Z	INFO	[secret] Please see https://trivy.dev/docs/v0.70/guide/scanner/secret#recommendation for faster secret detection
+2026-10-07T17:08:11Z	INFO	Detected OS	family="debian" version="13.7"
+2026-10-07T17:08:11Z	INFO	[debian] Detecting vulnerabilities...	os_version="13" pkg_num=87
+2026-10-07T17:08:11Z	INFO	Number of language-specific files	num=1
+2026-10-07T17:08:11Z	INFO	[python-pkg] Detecting vulnerabilities...
+2026-10-07T17:08:11Z	WARN	Using severities from other vendors for some vulnerabilities. Read https://trivy.dev/docs/v0.70/guide/scanner/vulnerability#severity-selection for details.
+2026-10-07T17:08:11Z	INFO	Table result includes only package filenames. Use '--format json' option to get the full path to the package file.
+Report Summary
+┌──────────────────────────────────────────────────────────────────────────────┬────────────┬─────────────────┬─────────┐
+│                                    Target                                    │    Type    │ Vulnerabilities │ Secrets │
+├──────────────────────────────────────────────────────────────────────────────┼────────────┼─────────────────┼─────────┤
+│ ghcr.io/kunalkumar-13/secure-api:b202ae83e8a4 (debian 13.7)                  │   debian   │       165       │    -    │
+├──────────────────────────────────────────────────────────────────────────────┼────────────┼─────────────────┼─────────┤
+│ usr/local/lib/python3.12/site-packages/blinker-1.9.0.dist-info/METADATA      │ python-pkg │        0        │    -    │
+├──────────────────────────────────────────────────────────────────────────────┼────────────┼─────────────────┼─────────┤
+│ usr/local/lib/python3.12/site-packages/click-8.5.0.dist-info/METADATA        │ python-pkg │        0        │    -    │
+├──────────────────────────────────────────────────────────────────────────────┼────────────┼─────────────────┼─────────┤
+│ usr/local/lib/python3.12/site-packages/flask-3.1.3.dist-info/METADATA        │ python-pkg │        0        │    -    │
+├──────────────────────────────────────────────────────────────────────────────┼────────────┼─────────────────┼─────────┤
+│ usr/local/lib/python3.12/site-packages/gunicorn-26.2.0.dist-info/METADATA    │ python-pkg │        0        │    -    │
+├──────────────────────────────────────────────────────────────────────────────┼────────────┼─────────────────┼─────────┤
+│ usr/local/lib/python3.12/site-packages/itsdangerous-2.2.0.dist-info/METADATA │ python-pkg │        0        │    -    │
+├──────────────────────────────────────────────────────────────────────────────┼────────────┼─────────────────┼─────────┤
+│ usr/local/lib/python3.12/site-packages/jinja2-3.1.6.dist-info/METADATA       │ python-pkg │        0        │    -    │
+├──────────────────────────────────────────────────────────────────────────────┼────────────┼─────────────────┼─────────┤
+│ usr/local/lib/python3.12/site-packages/markupsafe-3.0.4.dist-info/METADATA   │ python-pkg │        0        │    -    │
+├──────────────────────────────────────────────────────────────────────────────┼────────────┼─────────────────┼─────────┤
+│ usr/local/lib/python3.12/site-packages/pip-25.0.1.dist-info/METADATA         │ python-pkg │        6        │    -    │
+├──────────────────────────────────────────────────────────────────────────────┼────────────┼─────────────────┼─────────┤
+│ usr/local/lib/python3.12/site-packages/werkzeug-3.1.9.dist-info/METADATA     │ python-pkg │        0        │    -    │
+└──────────────────────────────────────────────────────────────────────────────┴────────────┴─────────────────┴─────────┘
+Legend:
+ghcr.io/kunalkumar-13/secure-api:b202ae83e8a4 (debian 13.7)
+Total: 165 (UNKNOWN: 2, LOW: 61, MEDIUM: 58, HIGH: 44, CRITICAL: 0)
+Python (python-pkg)
+Total: 6 (UNKNOWN: 0, LOW: 1, MEDIUM: 5, HIGH: 0, CRITICAL: 0)
+[... 678 lines of per-package detail omitted ...]
+
+$ trivy image <image>   # step 'Security gate': severity HIGH,CRITICAL, ignore-unfixed, exit-code 1
+Running Trivy with options: trivy image ghcr.io/kunalkumar-13/secure-api:b202ae83e8a4
+2026-10-07T17:08:16Z	INFO	[vuln] Vulnerability scanning is enabled
+2026-10-07T17:08:16Z	INFO	[secret] Secret scanning is enabled
+2026-10-07T17:08:16Z	INFO	[secret] If your scanning is slow, please try '--scanners vuln' to disable secret scanning
+2026-10-07T17:08:16Z	INFO	[secret] Please see https://trivy.dev/docs/v0.70/guide/scanner/secret#recommendation for faster secret detection
+2026-10-07T17:08:25Z	INFO	Detected OS	family="debian" version="13.7"
+2026-10-07T17:08:25Z	INFO	[debian] Detecting vulnerabilities...	os_version="13" pkg_num=87
+2026-10-07T17:08:25Z	INFO	Number of language-specific files	num=1
+2026-10-07T17:08:25Z	INFO	[python-pkg] Detecting vulnerabilities...
+2026-10-07T17:08:25Z	WARN	Using severities from other vendors for some vulnerabilities. Read https://trivy.dev/docs/v0.70/guide/scanner/vulnerability#severity-selection for details.
+Report Summary
+┌──────────────────────────────────────────────────────────────────────────────┬────────────┬─────────────────┬─────────┐
+│                                    Target                                    │    Type    │ Vulnerabilities │ Secrets │
+├──────────────────────────────────────────────────────────────────────────────┼────────────┼─────────────────┼─────────┤
+│ ghcr.io/kunalkumar-13/secure-api:b202ae83e8a4 (debian 13.7)                  │   debian   │        0        │    -    │
+├──────────────────────────────────────────────────────────────────────────────┼────────────┼─────────────────┼─────────┤
+📣 Notices:
+  - Version 0.75.0 of Trivy is now available, current version is 0.70.0
+To suppress version checks, run Trivy scans with the --skip-version-check flag
+│ usr/local/lib/python3.12/site-packages/blinker-1.9.0.dist-info/METADATA      │ python-pkg │        0        │    -    │
+├──────────────────────────────────────────────────────────────────────────────┼────────────┼─────────────────┼─────────┤
+│ usr/local/lib/python3.12/site-packages/click-8.5.0.dist-info/METADATA        │ python-pkg │        0        │    -    │
+├──────────────────────────────────────────────────────────────────────────────┼────────────┼─────────────────┼─────────┤
+│ usr/local/lib/python3.12/site-packages/flask-3.1.3.dist-info/METADATA        │ python-pkg │        0        │    -    │
+├──────────────────────────────────────────────────────────────────────────────┼────────────┼─────────────────┼─────────┤
+│ usr/local/lib/python3.12/site-packages/gunicorn-26.2.0.dist-info/METADATA    │ python-pkg │        0        │    -    │
+├──────────────────────────────────────────────────────────────────────────────┼────────────┼─────────────────┼─────────┤
+│ usr/local/lib/python3.12/site-packages/itsdangerous-2.2.0.dist-info/METADATA │ python-pkg │        0        │    -    │
+├──────────────────────────────────────────────────────────────────────────────┼────────────┼─────────────────┼─────────┤
+│ usr/local/lib/python3.12/site-packages/jinja2-3.1.6.dist-info/METADATA       │ python-pkg │        0        │    -    │
+├──────────────────────────────────────────────────────────────────────────────┼────────────┼─────────────────┼─────────┤
+│ usr/local/lib/python3.12/site-packages/markupsafe-3.0.4.dist-info/METADATA   │ python-pkg │        0        │    -    │
+├──────────────────────────────────────────────────────────────────────────────┼────────────┼─────────────────┼─────────┤
+│ usr/local/lib/python3.12/site-packages/pip-25.0.1.dist-info/METADATA         │ python-pkg │        0        │    -    │
+├──────────────────────────────────────────────────────────────────────────────┼────────────┼─────────────────┼─────────┤
+│ usr/local/lib/python3.12/site-packages/werkzeug-3.1.9.dist-info/METADATA     │ python-pkg │        0        │    -    │
+└──────────────────────────────────────────────────────────────────────────────┴────────────┴─────────────────┴─────────┘
+Legend:
+[... 2 lines of per-package detail omitted ...]
+
+$ docker save ghcr.io/kunalkumar-13/secure-api:b202ae83e8a4 | gzip > /tmp/image.tar.gz
+
+------------------------------------------------------------------------------
+JOB: Push to GHCR
+------------------------------------------------------------------------------
+
+$ docker load < /tmp/image.tar.gz
+  docker push ghcr.io/kunalkumar-13/secure-api:b202ae83e8a4
+Loaded image: ghcr.io/kunalkumar-13/secure-api:b202ae83e8a4
+The push refers to repository [ghcr.io/kunalkumar-13/secure-api]
+e69ac52aff25: Preparing
+e6101a5e02d0: Preparing
+f3006add7526: Preparing
+f54a52e1ea31: Preparing
+c1dde223bca1: Preparing
+2e7dca583845: Preparing
+dca2a125b490: Preparing
+b361fa3b9794: Preparing
+e1fa2746ad6d: Preparing
+15f1c8eb1ab1: Preparing
+dca2a125b490: Waiting
+b361fa3b9794: Waiting
+e1fa2746ad6d: Waiting
+15f1c8eb1ab1: Waiting
+2e7dca583845: Waiting
+e6101a5e02d0: Pushed
+e69ac52aff25: Pushed
+c1dde223bca1: Pushed
+f54a52e1ea31: Pushed
+f3006add7526: Pushed
+e1fa2746ad6d: Pushed
+2e7dca583845: Pushed
+dca2a125b490: Pushed
+b361fa3b9794: Pushed
+15f1c8eb1ab1: Pushed
+b202ae83e8a4: digest: sha256:65f92438725ef12f7c2a2adb7ec91adf464e46967302aa1340df599543468a59 size: 2405
+
+------------------------------------------------------------------------------
+JOB: Deploy to Kubernetes (kind)
+------------------------------------------------------------------------------
+
+$ docker load < /tmp/image.tar.gz
+  kind load docker-image ghcr.io/kunalkumar-13/secure-api:b202ae83e8a4 --name devsecops
+Loaded image: ghcr.io/kunalkumar-13/secure-api:b202ae83e8a4
+Image: "ghcr.io/kunalkumar-13/secure-api:b202ae83e8a4" with ID "sha256:ac3d7a033d782c336dca2ef15a2cd73ec11469d8c940951349394733ac51169a" not yet present on node "devsecops-control-plane", loading...
+
+$ sed "s#IMAGE_PLACEHOLDER#ghcr.io/kunalkumar-13/secure-api:b202ae83e8a4#" k8s/deployment.yaml | kubectl apply -f -
+  kubectl rollout status deployment/secure-api --timeout=180s
+  kubectl get pods -l app=secure-api -o wide
+deployment.apps/secure-api created
+service/secure-api created
+Waiting for deployment "secure-api" rollout to finish: 0 out of 2 new replicas have been updated...
+Waiting for deployment "secure-api" rollout to finish: 0 of 2 updated replicas are available...
+Waiting for deployment "secure-api" rollout to finish: 1 of 2 updated replicas are available...
+deployment "secure-api" successfully rolled out
+NAME                          READY   STATUS    RESTARTS   AGE   IP           NODE                      NOMINATED NODE   READINESS GATES
+secure-api-5879dcd7f8-4n2q4   1/1     Running   0          6s    10.244.0.6   devsecops-control-plane   <none>           <none>
+secure-api-5879dcd7f8-sl5zh   1/1     Running   0          6s    10.244.0.5   devsecops-control-plane   <none>           <none>
+
+$ # read the result from the pod's logs: attaching with -i can miss output from a pod this short
+  kubectl run smoke --restart=Never --image=curlimages/curl:8.10.1 -- \
+    sh -c 'curl -sf http://secure-api/health && echo && curl -sf "http://secure-api/add?a=2&b=3" && echo'
+  kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/smoke --timeout=60s
+  kubectl logs smoke
+  kubectl logs smoke | grep -q '"result":5.0'
+  pod=$(kubectl get pod -l app=secure-api -o jsonpath='{.items[0].metadata.name}')
+  echo "user inside the container: $(kubectl exec $pod -- id)"
+  kubectl exec $pod -- sh -c 'touch /app/x 2>&1 || echo "root filesystem is read-only, as configured"'
+pod/smoke created
+pod/smoke condition met
+{"status":"ok","version":"b202ae83e8a4"}
+{"result":5.0}
+user inside the container: uid=10001(appuser) gid=10001(appuser) groups=10001(appuser)
+touch: cannot touch '/app/x': Read-only file system
+root filesystem is read-only, as configured

@@ -1,0 +1,185 @@
+
+############################################################
+#  1. Install Argo CD v3.5.4
+############################################################
+
+kunal@gitops-lab:~$ kubectl create namespace argocd
+namespace/argocd created
+
+kunal@gitops-lab:~$ kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.5.4/manifests/install.yaml | tail -5
+networkpolicy.networking.k8s.io/argocd-dex-server-network-policy serverside-applied
+networkpolicy.networking.k8s.io/argocd-notifications-controller-network-policy serverside-applied
+networkpolicy.networking.k8s.io/argocd-redis-network-policy serverside-applied
+networkpolicy.networking.k8s.io/argocd-repo-server-network-policy serverside-applied
+networkpolicy.networking.k8s.io/argocd-server-network-policy serverside-applied
+
+kunal@gitops-lab:~$ kubectl -n argocd rollout status deployment/argocd-server --timeout=300s && kubectl -n argocd rollout status deployment/argocd-repo-server --timeout=300s && kubectl -n argocd rollout status statefulset/argocd-application-controller --timeout=300s
+Waiting for deployment "argocd-server" rollout to finish: 0 out of 1 new replicas have been updated...
+Waiting for deployment "argocd-server" rollout to finish: 0 of 1 updated replicas are available...
+deployment "argocd-server" successfully rolled out
+deployment "argocd-repo-server" successfully rolled out
+partitioned roll out complete: 1 new pods have been updated...
+
+kunal@gitops-lab:~$ kubectl get pods -n argocd
+NAME                                                READY   STATUS    RESTARTS   AGE
+argocd-application-controller-0                     1/1     Running   0          27s
+argocd-applicationset-controller-76fd8cdd4f-2dh87   1/1     Running   0          27s
+argocd-dex-server-66c78cf887-kdgh2                  1/1     Running   0          27s
+argocd-notifications-controller-7fb9868fd6-4vtqk    1/1     Running   0          27s
+argocd-redis-bdbdffcb4-hgbdk                        1/1     Running   0          27s
+argocd-repo-server-d89c7967d-czqtf                  1/1     Running   0          27s
+argocd-server-776b7cdd4d-t5hqh                      1/1     Running   0          27s
+
+
+############################################################
+#  2. The Git side: what Argo CD will watch
+############################################################
+
+>>> repository https://github.com/kunalKumar-13/devops-heros, branch gitops-demo-37657639033, path 19-monitoring-observability-gitops/gitops/app
+
+kunal@gitops-lab:~$ ls gitops/app && grep -n 'replicas' gitops/app/deployment.yaml
+deployment.yaml
+namespace.yaml
+service.yaml
+2:# changing `replicas` here (and pushing) is how the app gets scaled.
+11:  replicas: 2
+
+
+############################################################
+#  3. Create the Application
+############################################################
+
+kunal@gitops-lab:~$ sed 's#TARGET_REVISION#gitops-demo-37657639033#' argocd/application.yaml | kubectl apply -f -
+application.argoproj.io/session20-mini created
+
+kunal@gitops-lab:~$ kubectl get applications -n argocd
+NAME             SYNC STATUS   HEALTH STATUS
+session20-mini   Synced        Healthy
+
+
+############################################################
+#  4. What Argo CD created in the cluster
+############################################################
+
+kunal@gitops-lab:~$ kubectl get all -n session20
+NAME                                 READY   STATUS    RESTARTS   AGE
+pod/session20-mini-d54b76c44-76nn6   1/1     Running   0          4s
+pod/session20-mini-d54b76c44-m4zwt   1/1     Running   0          4s
+
+NAME                     TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)   AGE
+service/session20-mini   ClusterIP   10.96.35.88   <none>        80/TCP    4s
+
+NAME                             READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/session20-mini   2/2     2            2           4s
+
+NAME                                       DESIRED   CURRENT   READY   AGE
+replicaset.apps/session20-mini-d54b76c44   2         2         2       4s
+
+
+############################################################
+#  5. Make a Git change: scale from 2 to 3 replicas, in Git only
+############################################################
+
+kunal@gitops-lab:~$ sed -i 's/replicas: 2/replicas: 3/' gitops/app/deployment.yaml && git diff gitops/app/deployment.yaml
+diff --git a/19-monitoring-observability-gitops/gitops/app/deployment.yaml b/19-monitoring-observability-gitops/gitops/app/deployment.yaml
+index c37e8a5..b8f1bd7 100644
+--- a/19-monitoring-observability-gitops/gitops/app/deployment.yaml
++++ b/19-monitoring-observability-gitops/gitops/app/deployment.yaml
+@@ -8,7 +8,7 @@ metadata:
+   labels:
+     app: session20-mini
+ spec:
+-  replicas: 2
++  replicas: 3
+   selector:
+     matchLabels:
+       app: session20-mini
+
+kunal@gitops-lab:~$ git add gitops/app/deployment.yaml && git -c user.name=kunalKumar-13 -c user.email=kunalsain0324@gmail.com commit -q -m 'Scale application to three replicas' && git log --oneline -1
+b491713 Scale application to three replicas
+
+kunal@gitops-lab:~$ git push -q origin HEAD:gitops-demo-37657639033 && echo pushed to gitops-demo-37657639033
+pushed to gitops-demo-37657639033
+
+>>> no kubectl apply from here on: only Git changed
+
+kunal@gitops-lab:~$ kubectl annotate application session20-mini -n argocd argocd.argoproj.io/refresh=normal --overwrite
+application.argoproj.io/session20-mini annotated
+
+kunal@gitops-lab:~$ kubectl get deployment session20-mini -n session20
+NAME             READY   UP-TO-DATE   AVAILABLE   AGE
+session20-mini   3/3     3            3           8s
+
+kunal@gitops-lab:~$ kubectl get application session20-mini -n argocd -o jsonpath='synced to commit: {.status.sync.revision}{"\n"}'
+synced to commit: b491713041342de3d65a5dfc37c2a81ba512d382
+
+kunal@gitops-lab:~$ git rev-parse HEAD
+b491713041342de3d65a5dfc37c2a81ba512d382
+
+>>> the synced revision is the commit just pushed: Git -> Argo CD -> Kubernetes
+
+
+############################################################
+#  6. Self-healing: change the cluster by hand and watch Argo CD undo it
+############################################################
+
+kunal@gitops-lab:~$ kubectl scale deployment session20-mini -n session20 --replicas=1
+deployment.apps/session20-mini scaled
+
+kunal@gitops-lab:~$ kubectl get deployment session20-mini -n session20
+NAME             READY   UP-TO-DATE   AVAILABLE   AGE
+session20-mini   1/1     1            1           9s
+
+>>> Git still says 3, and selfHeal is on
+
+kunal@gitops-lab:~$ kubectl get deployment session20-mini -n session20
+NAME             READY   UP-TO-DATE   AVAILABLE   AGE
+session20-mini   3/3     3            3           12s
+
+kunal@gitops-lab:~$ kubectl get events -n session20 --sort-by=.lastTimestamp | grep -i scaled | tail -4
+12s         Normal    ScalingReplicaSet   deployment/session20-mini             Scaled up replica set session20-mini-d54b76c44 from 0 to 2
+6s          Normal    ScalingReplicaSet   deployment/session20-mini             Scaled up replica set session20-mini-d54b76c44 from 2 to 3
+4s          Normal    ScalingReplicaSet   deployment/session20-mini             Scaled down replica set session20-mini-d54b76c44 from 3 to 1
+3s          Normal    ScalingReplicaSet   deployment/session20-mini             Scaled up replica set session20-mini-d54b76c44 from 1 to 3
+
+
+############################################################
+#  7. Pruning: delete the Service by hand, Argo CD recreates it
+############################################################
+
+kunal@gitops-lab:~$ kubectl delete service session20-mini -n session20
+service "session20-mini" deleted from session20 namespace
+
+kunal@gitops-lab:~$ kubectl get service session20-mini -n session20
+NAME             TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE
+session20-mini   ClusterIP   10.96.149.76   <none>        80/TCP    20s
+
+
+############################################################
+#  8. Observe the system
+############################################################
+
+kunal@gitops-lab:~$ kubectl logs deployment/session20-mini -n session20 --tail=5
+Found 3 pods, using pod/session20-mini-d54b76c44-76nn6
+10.244.0.1 - - [07/Oct/2026:17:16:43 +0000] "GET / HTTP/1.1" 200 615 "-" "kube-probe/1.37" "-"
+10.244.0.1 - - [07/Oct/2026:17:16:48 +0000] "GET / HTTP/1.1" 200 615 "-" "kube-probe/1.37" "-"
+10.244.0.1 - - [07/Oct/2026:17:16:53 +0000] "GET / HTTP/1.1" 200 615 "-" "kube-probe/1.37" "-"
+10.244.0.1 - - [07/Oct/2026:17:16:58 +0000] "GET / HTTP/1.1" 200 615 "-" "kube-probe/1.37" "-"
+10.244.0.1 - - [07/Oct/2026:17:17:03 +0000] "GET / HTTP/1.1" 200 615 "-" "kube-probe/1.37" "-"
+
+kunal@gitops-lab:~$ kubectl get application session20-mini -n argocd -o jsonpath='{range .status.history[*]}{.id}  {.revision}  {.deployedAt}{"\n"}{end}'
+0  bd90bf0b5f81ffce9365d163f24bdad1c36408c7  2026-10-07T17:16:35Z
+1  b491713041342de3d65a5dfc37c2a81ba512d382  2026-10-07T17:16:41Z
+
+
+############################################################
+#  Verified results: 6 passed, 0 failed
+############################################################
+
+  PASS  Argo CD reports the app Synced and Healthy
+  PASS  Argo CD created the deployment with 2 ready replicas, as Git says
+  PASS  after the Git change the deployment has 3 ready replicas
+  PASS  Argo CD synced exactly the commit that was pushed
+  PASS  self-healing: a manual scale to 1 was reverted to 3
+  PASS  a Service deleted by hand was recreated by Argo CD
+

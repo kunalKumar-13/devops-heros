@@ -6,14 +6,10 @@ All five manifests are in [`manifests/`](manifests/) and the four deployment str
 in [`rollout-strategies/`](rollout-strategies/). Every file is commented with *why* each
 field is there, not just what it is.
 
-> **Evidence note** — sections 01–07 carry captured terminal output and screenshots
-> from a live Ubuntu VM. These Kubernetes sections do **not** yet: the write-up and
-> the manifests are complete and applied-tested for schema, but no cluster run is
-> recorded here, and nothing below is presented as captured output. To produce that
-> evidence, bring up the cluster from
-> [section 08 §5](../08-kubernetes-fundamentals/#5-lab-environment-used-for-sections-0911)
-> and run [`logs/capture-k8s.sh`](../logs/capture-k8s.sh) `2` — it runs every command
-> in this section and writes the transcript to `logs/k8s2.txt`.
+> **Evidence.** Run on a real cluster (kind, 2 nodes) in GitHub Actions by
+> [`logs/capture-k8s.sh`](../logs/capture-k8s.sh) `2`, which prints each command before its
+> output. The full, unedited transcript is [`logs/k8s2.txt`](../logs/k8s2.txt): every command in this section: a bare Pod, ReplicaSet self-healing, a Deployment rolling update and rollback, a DaemonSet, a StatefulSet, the pod lifecycle states, three deliberately broken manifests and the deployment strategies.
+> Run: <https://github.com/kunalKumar-13/devops-heros/actions/runs/37657639033>
 
 ---
 

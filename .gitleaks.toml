@@ -6,13 +6,17 @@
 # like (and that base64 is not encryption). They are not real credentials and
 # protect nothing, so they are allowlisted by path rather than by disabling any
 # rule. A real credential committed anywhere else still fails the pipeline.
+#
+# logs/k8s4.txt is the recorded run of that same Session 12 lab: it prints the
+# same fake DB_PASSWORD after decoding it, which is the point of the exercise.
 
 [extend]
 useDefault = true
 
 [allowlist]
-description = "Session 12 sample Secret manifests (fake credentials used for teaching)"
+description = "Session 12 sample Secret manifests and their recorded run (fake credentials used for teaching)"
 paths = [
   '''^session-12-ingress-configmaps-secrets/''',
   '''^11-kubernetes-ingress-configmaps-secrets/''',
+  '''^logs/k8s4\.txt$''',
 ]

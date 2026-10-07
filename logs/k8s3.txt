@@ -1,0 +1,240 @@
+
+############################################################
+#  10.0  the shared backend and a client pod
+############################################################
+
+kunal@kind-lab:~/devops-heros$ kubectl apply -f 10-kubernetes-services/00-backend-deployment.yaml
+deployment.apps/web created
+
+kunal@kind-lab:~/devops-heros$ kubectl apply -f 10-kubernetes-services/01-clusterip/client-pod.yaml
+pod/client created
+
+kunal@kind-lab:~/devops-heros$ kubectl rollout status deploy/web --timeout=180s
+Waiting for deployment "web" rollout to finish: 0 of 3 updated replicas are available...
+Waiting for deployment "web" rollout to finish: 1 of 3 updated replicas are available...
+Waiting for deployment "web" rollout to finish: 2 of 3 updated replicas are available...
+deployment "web" successfully rolled out
+
+kunal@kind-lab:~/devops-heros$ kubectl wait --for=condition=Ready pod/client --timeout=120s
+pod/client condition met
+
+kunal@kind-lab:~/devops-heros$ kubectl get pods -o wide
+NAME                   READY   STATUS        RESTARTS   AGE     IP            NODE                   NOMINATED NODE   READINESS GATES
+client                 1/1     Running       0          4s      10.244.1.51   devops-worker          <none>           <none>
+node-logger-nf6rl      1/1     Terminating   0          2m14s   10.244.1.20   devops-worker          <none>           <none>
+node-logger-zd2c7      1/1     Terminating   0          2m14s   10.244.0.5    devops-control-plane   <none>           <none>
+web-78cfbfbc5d-89khr   1/1     Running       0          4s      10.244.1.48   devops-worker          <none>           <none>
+web-78cfbfbc5d-gsbt7   1/1     Running       0          4s      10.244.1.50   devops-worker          <none>           <none>
+web-78cfbfbc5d-ndr29   1/1     Running       0          4s      10.244.1.49   devops-worker          <none>           <none>
+
+
+############################################################
+#  10.1  ClusterIP - internal only, and it load-balances
+############################################################
+
+kunal@kind-lab:~/devops-heros$ kubectl apply -f 10-kubernetes-services/01-clusterip/service.yaml
+service/web-clusterip created
+
+kunal@kind-lab:~/devops-heros$ kubectl get svc web-clusterip
+NAME            TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE
+web-clusterip   ClusterIP   10.96.81.166   <none>        80/TCP    0s
+
+kunal@kind-lab:~/devops-heros$ kubectl get endpointslice -l kubernetes.io/service-name=web-clusterip -o wide
+NAME                  ADDRESSTYPE   PORTS   ENDPOINTS                             AGE
+web-clusterip-zfx4p   IPv4          8080    10.244.1.48,10.244.1.50,10.244.1.49   0s
+
+kunal@kind-lab:~/devops-heros$ for i in 1 2 3 4 5 6; do kubectl exec client -- curl -s -m 10 http://web-clusterip/ | grep -i '^Hostname'; done
+command terminated with exit code 7
+command terminated with exit code 7
+command terminated with exit code 7
+command terminated with exit code 7
+command terminated with exit code 7
+command terminated with exit code 7
+
+
+############################################################
+#  10.2  ClusterIP with zero endpoints - the commonest failure
+############################################################
+
+kunal@kind-lab:~/devops-heros$ kubectl scale deploy/web --replicas=0
+deployment.apps/web scaled
+
+kunal@kind-lab:~/devops-heros$ sleep 10; kubectl get endpointslice -l kubernetes.io/service-name=web-clusterip
+NAME                  ADDRESSTYPE   PORTS   ENDPOINTS                             AGE
+web-clusterip-zfx4p   IPv4          8080    10.244.1.48,10.244.1.50,10.244.1.49   10s
+
+kunal@kind-lab:~/devops-heros$ kubectl exec client -- curl -s --max-time 5 http://web-clusterip/ || echo 'curl failed: no endpoints'
+
+
+Hostname: web-78cfbfbc5d-ndr29
+
+Pod Information:
+	-no pod information available-
+
+Server values:
+	server_version=nginx: 1.13.3 - lua: 10008
+
+Request Information:
+	client_address=10.244.1.51
+	method=GET
+	real path=/
+	query=
+	request_version=1.1
+	request_scheme=http
+	request_uri=http://web-clusterip:8080/
+
+Request Headers:
+	accept=*/*
+	host=web-clusterip
+	user-agent=curl/8.10.1
+
+Request Body:
+	-no body in request-
+
+
+kunal@kind-lab:~/devops-heros$ kubectl scale deploy/web --replicas=3
+deployment.apps/web scaled
+
+kunal@kind-lab:~/devops-heros$ kubectl rollout status deploy/web --timeout=180s
+Waiting for deployment "web" rollout to finish: 0 of 3 updated replicas are available...
+Waiting for deployment "web" rollout to finish: 1 of 3 updated replicas are available...
+Waiting for deployment "web" rollout to finish: 2 of 3 updated replicas are available...
+deployment "web" successfully rolled out
+
+
+############################################################
+#  10.3  NodePort - reachable on the node IP
+############################################################
+
+kunal@kind-lab:~/devops-heros$ kubectl apply -f 10-kubernetes-services/02-nodeport/service.yaml
+service/web-nodeport created
+
+kunal@kind-lab:~/devops-heros$ kubectl get svc web-nodeport
+NAME           TYPE       CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+web-nodeport   NodePort   10.96.64.210   <none>        80:30080/TCP   0s
+
+kunal@kind-lab:~/devops-heros$ curl -s http://127.0.0.1:30080/ | head -12
+
+kunal@kind-lab:~/devops-heros$ echo NodePort URL: http://127.0.0.1:30080
+NodePort URL: http://127.0.0.1:30080
+
+
+############################################################
+#  10.4  LoadBalancer - EXTERNAL-IP pending without a cloud controller
+############################################################
+
+kunal@kind-lab:~/devops-heros$ kubectl apply -f 10-kubernetes-services/03-loadbalancer/service.yaml
+service/web-lb created
+
+kunal@kind-lab:~/devops-heros$ sleep 10; kubectl get svc web-lb
+NAME     TYPE           CLUSTER-IP    EXTERNAL-IP   PORT(S)        AGE
+web-lb   LoadBalancer   10.96.43.74   <pending>     80:32287/TCP   10s
+
+kunal@kind-lab:~/devops-heros$ echo EXTERNAL-IP stays pending without a cloud controller - see the README
+EXTERNAL-IP stays pending without a cloud controller - see the README
+
+
+############################################################
+#  10.5  ExternalName - a DNS CNAME, no endpoints at all
+############################################################
+
+kunal@kind-lab:~/devops-heros$ kubectl apply -f 10-kubernetes-services/04-externalname/service.yaml
+service/external-db created
+
+kunal@kind-lab:~/devops-heros$ kubectl get svc external-db
+NAME          TYPE           CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+external-db   ExternalName   <none>       example.com   <none>    0s
+
+kunal@kind-lab:~/devops-heros$ kubectl exec client -- nslookup external-db.default.svc.cluster.local || true
+Server:		10.96.0.10
+Address:	10.96.0.10:53
+
+external-db.default.svc.cluster.local	canonical name = example.com
+Name:	example.com
+Address: 2606:4700:10::ac42:93f3
+Name:	example.com
+Address: 2606:4700:10::6814:179a
+
+external-db.default.svc.cluster.local	canonical name = example.com
+Name:	example.com
+Address: 104.20.23.154
+Name:	example.com
+Address: 172.66.147.243
+
+
+
+############################################################
+#  10.6  Headless - DNS returns every pod IP
+############################################################
+
+kunal@kind-lab:~/devops-heros$ kubectl apply -f 10-kubernetes-services/05-headless/service.yaml
+service/web-headless created
+
+kunal@kind-lab:~/devops-heros$ kubectl get svc web-headless
+NAME           TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)    AGE
+web-headless   ClusterIP   None         <none>        8080/TCP   0s
+
+kunal@kind-lab:~/devops-heros$ kubectl exec client -- nslookup web-headless.default.svc.cluster.local || true
+Server:		10.96.0.10
+Address:	10.96.0.10:53
+
+
+Name:	web-headless.default.svc.cluster.local
+Address: 10.244.1.53
+Name:	web-headless.default.svc.cluster.local
+Address: 10.244.1.52
+Name:	web-headless.default.svc.cluster.local
+Address: 10.244.1.54
+
+
+
+############################################################
+#  10.7  Service DNS and the FQDN
+############################################################
+
+kunal@kind-lab:~/devops-heros$ kubectl exec client -- cat /etc/resolv.conf
+search default.svc.cluster.local svc.cluster.local cluster.local 0gqs0ta2rw1ujinpmfpwih0fxf.gx.internal.cloudapp.net
+nameserver 10.96.0.10
+options ndots:5
+
+kunal@kind-lab:~/devops-heros$ kubectl exec client -- nslookup web-clusterip || true
+Server:		10.96.0.10
+Address:	10.96.0.10:53
+
+Name:	web-clusterip.default.svc.cluster.local
+Address: 10.96.81.166
+
+
+** server can't find web-clusterip.svc.cluster.local: NXDOMAIN
+
+** server can't find web-clusterip.svc.cluster.local: NXDOMAIN
+
+** server can't find web-clusterip.cluster.local: NXDOMAIN
+
+** server can't find web-clusterip.cluster.local: NXDOMAIN
+
+** server can't find web-clusterip.0gqs0ta2rw1ujinpmfpwih0fxf.gx.internal.cloudapp.net: NXDOMAIN
+
+** server can't find web-clusterip.0gqs0ta2rw1ujinpmfpwih0fxf.gx.internal.cloudapp.net: NXDOMAIN
+
+command terminated with exit code 1
+
+kunal@kind-lab:~/devops-heros$ kubectl -n kube-system get pods -l k8s-app=kube-dns
+NAME                       READY   STATUS    RESTARTS   AGE
+coredns-559f6c778d-fr8ld   1/1     Running   0          4m26s
+coredns-559f6c778d-m5lr2   1/1     Running   0          4m26s
+
+
+############################################################
+#  10.8  cleanup
+############################################################
+
+kunal@kind-lab:~/devops-heros$ kubectl delete -f 10-kubernetes-services/05-headless/ -f 10-kubernetes-services/04-externalname/ -f 10-kubernetes-services/03-loadbalancer/ -f 10-kubernetes-services/02-nodeport/ -f 10-kubernetes-services/01-clusterip/ -f 10-kubernetes-services/00-backend-deployment.yaml --ignore-not-found
+service "web-headless" deleted from default namespace
+service "external-db" deleted from default namespace
+service "web-lb" deleted from default namespace
+service "web-nodeport" deleted from default namespace
+pod "client" deleted from default namespace
+service "web-clusterip" deleted from default namespace
+deployment.apps "web" deleted from default namespace
+

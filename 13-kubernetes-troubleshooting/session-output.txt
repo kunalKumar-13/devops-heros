@@ -1,0 +1,319 @@
+
+############################################################
+#  1. Deploy the application
+############################################################
+
+kunal@kind-lab:~$ kubectl apply -f manifests/01-app.yaml
+deployment.apps/troubleshooting-app created
+service/troubleshooting-service created
+
+kunal@kind-lab:~$ kubectl rollout status deployment/troubleshooting-app --timeout=180s
+Waiting for deployment "troubleshooting-app" rollout to finish: 0 of 2 updated replicas are available...
+Waiting for deployment "troubleshooting-app" rollout to finish: 1 of 2 updated replicas are available...
+deployment "troubleshooting-app" successfully rolled out
+
+kunal@kind-lab:~$ kubectl get pods -l app=troubleshooting-app -o wide
+NAME                                   READY   STATUS    RESTARTS   AGE   IP            NODE            NOMINATED NODE   READINESS GATES
+troubleshooting-app-794bc67b9c-7gkxs   1/1     Running   0          1s    10.244.1.74   devops-worker   <none>           <none>
+troubleshooting-app-794bc67b9c-jzm7f   1/1     Running   0          1s    10.244.1.75   devops-worker   <none>           <none>
+
+
+############################################################
+#  2. Check the application: describe, logs, and from inside the pod
+############################################################
+
+kunal@kind-lab:~$ kubectl describe pod troubleshooting-app-794bc67b9c-7gkxs | grep -E '^(Name|Status|IP|Node):|Image:|Ready|Events' 
+Name:             troubleshooting-app-794bc67b9c-7gkxs
+Node:             devops-worker/172.18.0.2
+Status:           Running
+IP:               10.244.1.74
+    Image:          nginx:1.27-alpine
+    Ready:          True
+  PodReadyToStartContainers   True 
+  Ready                       True 
+  ContainersReady             True 
+Events:
+
+kunal@kind-lab:~$ kubectl logs troubleshooting-app-794bc67b9c-7gkxs --tail=5
+2026/10/07 17:26:25 [notice] 1#1: start worker processes
+2026/10/07 17:26:25 [notice] 1#1: start worker process 37
+2026/10/07 17:26:25 [notice] 1#1: start worker process 38
+2026/10/07 17:26:25 [notice] 1#1: start worker process 39
+2026/10/07 17:26:25 [notice] 1#1: start worker process 40
+
+kunal@kind-lab:~$ kubectl exec troubleshooting-app-794bc67b9c-7gkxs -- curl -s localhost | grep -i '<title>'
+<title>Welcome to nginx!</title>
+
+>>> now the same request through the Service
+
+kunal@kind-lab:~$ kubectl run curl-ok --rm -i -q --restart=Never --image=curlimages/curl:8.10.1 -- curl -s -o /dev/null -w 'HTTP %{http_code}\n' http://troubleshooting-service
+HTTP 200
+warning: couldn't attach to pod/curl-ok, falling back to streaming logs: Internal error occurred: Internal error occurred: error attaching to container: container is in CONTAINER_EXITED state
+HTTP 200
+
+
+############################################################
+#  3. Check the Service and its endpoints
+############################################################
+
+kunal@kind-lab:~$ kubectl get service troubleshooting-service
+NAME                      TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE
+troubleshooting-service   ClusterIP   10.96.189.133   <none>        80/TCP    5s
+
+kunal@kind-lab:~$ kubectl describe service troubleshooting-service | grep -E 'Selector|TargetPort|Endpoints'
+Selector:                 app=troubleshooting-app
+TargetPort:               80/TCP
+Endpoints:                10.244.1.75:80,10.244.1.74:80
+
+kunal@kind-lab:~$ kubectl get endpoints troubleshooting-service
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+NAME                      ENDPOINTS                       AGE
+troubleshooting-service   10.244.1.74:80,10.244.1.75:80   5s
+
+>>> endpoints list the pod IPs, so the Service has somewhere to send traffic
+
+
+############################################################
+#  4. Broken pod: bad image
+############################################################
+
+kunal@kind-lab:~$ kubectl apply -f manifests/02-broken-image.yaml
+pod/project-broken-pod created
+
+kunal@kind-lab:~$ kubectl get pod project-broken-pod
+NAME                 READY   STATUS             RESTARTS   AGE
+project-broken-pod   0/1     ImagePullBackOff   0          25s
+
+kunal@kind-lab:~$ kubectl describe pod project-broken-pod | sed -n '/Events:/,$p'
+Events:
+  Type     Reason     Age                From               Message
+  ----     ------     ----               ----               -------
+  Normal   Scheduled  25s                default-scheduler  Successfully assigned default/project-broken-pod to devops-worker
+  Normal   BackOff    25s                kubelet            spec.containers{nginx}: Back-off pulling image "nginx:1.27-doesnotexist"
+  Warning  Failed     25s                kubelet            spec.containers{nginx}: Error: ImagePullBackOff
+  Normal   Pulling    10s (x2 over 25s)  kubelet            spec.containers{nginx}: Pulling image "nginx:1.27-doesnotexist"
+  Warning  Failed     10s (x2 over 25s)  kubelet            spec.containers{nginx}: Failed to pull image "nginx:1.27-doesnotexist": rpc error: code = NotFound desc = failed to pull and unpack image "docker.io/library/nginx:1.27-doesnotexist": failed to resolve reference "docker.io/library/nginx:1.27-doesnotexist": docker.io/library/nginx:1.27-doesnotexist: not found
+  Warning  Failed     10s (x2 over 25s)  kubelet            spec.containers{nginx}: Error: ErrImagePull
+
+kunal@kind-lab:~$ kubectl logs project-broken-pod || true
+Error from server (BadRequest): container "nginx" in pod "project-broken-pod" is waiting to start: trying and failing to pull image
+
+>>> no logs: the container never started, so the evidence is only in the events
+
+kunal@kind-lab:~$ kubectl delete pod project-broken-pod
+pod "project-broken-pod" deleted from default namespace
+
+>>> fix: use a tag that exists
+
+kunal@kind-lab:~$ kubectl run fixed-image --image=nginx:1.27-alpine && kubectl wait --for=condition=Ready pod/fixed-image --timeout=120s
+pod/fixed-image created
+pod/fixed-image condition met
+
+kunal@kind-lab:~$ kubectl get pod fixed-image
+NAME          READY   STATUS    RESTARTS   AGE
+fixed-image   1/1     Running   0          1s
+
+kunal@kind-lab:~$ kubectl delete pod fixed-image
+pod "fixed-image" deleted from default namespace
+
+
+############################################################
+#  5. Service problem: selector does not match the pods
+############################################################
+
+kunal@kind-lab:~$ kubectl apply -f manifests/03-broken-service.yaml
+service/troubleshooting-service configured
+
+kunal@kind-lab:~$ kubectl get service troubleshooting-service
+NAME                      TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE
+troubleshooting-service   ClusterIP   10.96.189.133   <none>        80/TCP    36s
+
+kunal@kind-lab:~$ kubectl get endpoints troubleshooting-service
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+NAME                      ENDPOINTS   AGE
+troubleshooting-service   <none>      36s
+
+kunal@kind-lab:~$ kubectl run curl-broken --rm -i -q --restart=Never --image=curlimages/curl:8.10.1 -- curl -s -m 5 -o /dev/null -w 'HTTP %{http_code}\n' http://troubleshooting-service || echo 'request failed: nothing behind the Service'
+HTTP 000
+pod default/curl-broken terminated (Error)
+request failed: nothing behind the Service
+
+>>> root cause: compare the pod labels with the Service selector
+
+kunal@kind-lab:~$ kubectl get pods --show-labels -l app=troubleshooting-app
+NAME                                   READY   STATUS    RESTARTS   AGE   LABELS
+troubleshooting-app-794bc67b9c-7gkxs   1/1     Running   0          38s   app=troubleshooting-app,pod-template-hash=794bc67b9c
+troubleshooting-app-794bc67b9c-jzm7f   1/1     Running   0          38s   app=troubleshooting-app,pod-template-hash=794bc67b9c
+
+kunal@kind-lab:~$ kubectl describe service troubleshooting-service | grep -E 'Selector|Endpoints'
+Selector:                 app=wrong-app
+Endpoints:                
+
+>>> fix: put the selector back to app=troubleshooting-app
+
+kunal@kind-lab:~$ kubectl apply -f manifests/01-app.yaml
+deployment.apps/troubleshooting-app unchanged
+service/troubleshooting-service configured
+
+kunal@kind-lab:~$ kubectl get endpoints troubleshooting-service
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+NAME                      ENDPOINTS                       AGE
+troubleshooting-service   10.244.1.74:80,10.244.1.75:80   42s
+
+kunal@kind-lab:~$ kubectl run curl-fixed --rm -i -q --restart=Never --image=curlimages/curl:8.10.1 -- curl -s -o /dev/null -w 'HTTP %{http_code}\n' http://troubleshooting-service
+HTTP 200
+
+
+############################################################
+#  6. DNS: the Service name resolves inside the cluster
+############################################################
+
+kunal@kind-lab:~$ kubectl run dns-test --rm -i -q --restart=Never --image=busybox:1.36 -- nslookup troubleshooting-service.default.svc.cluster.local
+Server:		10.96.0.10
+Address:	10.96.0.10:53
+
+
+Name:	troubleshooting-service.default.svc.cluster.local
+Address: 10.96.189.133
+
+warning: couldn't attach to pod/dns-test, falling back to streaming logs: unable to upgrade connection: container dns-test not found in pod dns-test_default
+Server:		10.96.0.10
+Address:	10.96.0.10:53
+
+
+Name:	troubleshooting-service.default.svc.cluster.local
+Address: 10.96.189.133
+
+
+
+############################################################
+#  7. CrashLoopBackOff
+############################################################
+
+kunal@kind-lab:~$ kubectl apply -f manifests/04-crashloop.yaml
+pod/crashloop created
+
+kunal@kind-lab:~$ kubectl get pod crashloop
+NAME        READY   STATUS   RESTARTS      AGE
+crashloop   0/1     Error    3 (32s ago)   45s
+
+kunal@kind-lab:~$ kubectl logs crashloop
+starting
+FATAL: config file /etc/app.conf not found
+
+kunal@kind-lab:~$ kubectl describe pod crashloop | grep -E 'State|Reason|Exit Code|Restart Count|Back-off' | head -10
+    State:          Terminated
+      Reason:       Error
+      Exit Code:    1
+    Last State:     Terminated
+      Reason:       Error
+      Exit Code:    1
+    Restart Count:  3
+  Type     Reason     Age               From               Message
+  Warning  BackOff    8s (x3 over 44s)  kubelet            spec.containers{app}: Back-off restarting failed container app in pod crashloop_default(3c988b18-688d-488a-a660-058bd7f58ed2)
+
+kunal@kind-lab:~$ kubectl delete pod crashloop --wait=false
+pod "crashloop" deleted from default namespace
+
+
+############################################################
+#  8. Pending: the scheduler cannot place the pod
+############################################################
+
+kunal@kind-lab:~$ kubectl apply -f manifests/05-pending.yaml
+pod/pending created
+
+kunal@kind-lab:~$ kubectl get pod pending
+NAME      READY   STATUS    RESTARTS   AGE
+pending   0/1     Pending   0          10s
+
+kunal@kind-lab:~$ kubectl describe pod pending | sed -n '/Events:/,$p'
+Events:
+  Type     Reason            Age   From               Message
+  ----     ------            ----  ----               -------
+  Warning  FailedScheduling  10s   default-scheduler  0/2 nodes are available: 1 Insufficient cpu, 1 node(s) had untolerated taint(s). preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling.
+
+kunal@kind-lab:~$ kubectl delete pod pending --wait=false
+pod "pending" deleted from default namespace
+
+
+############################################################
+#  9. OOMKilled: the container exceeds its memory limit
+############################################################
+
+kunal@kind-lab:~$ kubectl apply -f manifests/06-oomkilled.yaml
+pod/oomkilled created
+
+kunal@kind-lab:~$ kubectl get pod oomkilled
+NAME        READY   STATUS      RESTARTS   AGE
+oomkilled   0/1     OOMKilled   0          25s
+
+kunal@kind-lab:~$ kubectl get pod oomkilled -o jsonpath='reason={.status.containerStatuses[0].state.terminated.reason} exitCode={.status.containerStatuses[0].state.terminated.exitCode}'; echo
+reason=OOMKilled exitCode=137
+
+kunal@kind-lab:~$ kubectl delete pod oomkilled --wait=false
+pod "oomkilled" deleted from default namespace
+
+
+############################################################
+#  10. Events across the namespace, newest last
+############################################################
+
+kunal@kind-lab:~$ kubectl get events --sort-by=.lastTimestamp | tail -25
+88s         Normal    Created                   pod/curl-fixed                              Container created
+88s         Normal    Pulled                    pod/curl-fixed                              Container image "curlimages/curl:8.10.1" already present on machine and can be accessed by the pod
+87s         Normal    Scheduled                 pod/c32582                                  Successfully assigned default/c32582 to devops-worker
+86s         Normal    Started                   pod/c32582                                  Container started
+86s         Normal    Created                   pod/c32582                                  Container created
+86s         Normal    Pulled                    pod/c32582                                  Container image "curlimages/curl:8.10.1" already present on machine and can be accessed by the pod
+85s         Normal    Scheduled                 pod/dns-test                                Successfully assigned default/dns-test to devops-worker
+84s         Normal    Started                   pod/dns-test                                Container started
+84s         Normal    Created                   pod/dns-test                                Container created
+84s         Normal    Pulled                    pod/dns-test                                Container image "busybox:1.36" already present on machine and can be accessed by the pod
+83s         Normal    Scheduled                 pod/d9090                                   Successfully assigned default/d9090 to devops-worker
+82s         Normal    Started                   pod/d9090                                   Container started
+82s         Normal    Created                   pod/d9090                                   Container created
+82s         Normal    Pulled                    pod/d9090                                   Container image "busybox:1.36" already present on machine and can be accessed by the pod
+81s         Normal    Scheduled                 pod/crashloop                               Successfully assigned default/crashloop to devops-worker
+43s         Warning   BackOff                   pod/crashloop                               Back-off restarting failed container app in pod crashloop_default(3c988b18-688d-488a-a660-058bd7f58ed2)
+43s         Normal    Started                   pod/crashloop                               Container started
+43s         Normal    Created                   pod/crashloop                               Container created
+43s         Normal    Pulled                    pod/crashloop                               Container image "busybox:1.36" already present on machine and can be accessed by the pod
+35s         Warning   FailedScheduling          pod/pending                                 0/2 nodes are available: 1 Insufficient cpu, 1 node(s) had untolerated taint(s). preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling.
+25s         Normal    Pulling                   pod/oomkilled                               Pulling image "python:3.12-alpine"
+25s         Normal    Scheduled                 pod/oomkilled                               Successfully assigned default/oomkilled to devops-worker
+23s         Normal    Started                   pod/oomkilled                               Container started
+23s         Normal    Created                   pod/oomkilled                               Container created
+23s         Normal    Pulled                    pod/oomkilled                               Successfully pulled image "python:3.12-alpine" in 1.526s (1.526s including waiting). Image size: 20643193 bytes.
+
+
+############################################################
+#  11. kubectl exec into a healthy pod
+############################################################
+
+kunal@kind-lab:~$ kubectl exec troubleshooting-app-794bc67b9c-7gkxs -- sh -c 'hostname; nginx -v 2>&1; ls /usr/share/nginx/html'
+troubleshooting-app-794bc67b9c-7gkxs
+nginx version: nginx/1.27.5
+50x.html
+index.html
+
+
+############################################################
+#  Verified results: 14 passed, 0 failed
+############################################################
+
+  PASS  inside the pod, nginx answers on localhost
+  PASS  baseline: the Service answers
+  PASS  baseline: the Service has endpoints
+  PASS  bad image: pod is stuck in ErrImagePull / ImagePullBackOff
+  PASS  bad image fixed: a pod with a real tag becomes Ready
+  PASS  broken selector: the Service has no endpoints
+  PASS  selector fixed: endpoints are back
+  PASS  selector fixed: the Service answers again
+  PASS  the Service DNS name resolves to the Service ClusterIP
+  PASS  crash loop: the container has been restarted
+  PASS  crash loop: the logs show why (FATAL config error)
+  PASS  pending: PodScheduled is false with reason Unschedulable
+  PASS  out of memory: terminated with reason OOMKilled
+  PASS  exec works inside a healthy pod
+
