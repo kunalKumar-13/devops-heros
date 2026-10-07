@@ -1,0 +1,18 @@
+# gitleaks configuration for this repository.
+#
+# The default rules apply everywhere. The only exception is the Session 12
+# teaching material on Kubernetes Secrets: those folders contain deliberately
+# fake credentials whose whole purpose is to show what a Secret manifest looks
+# like (and that base64 is not encryption). They are not real credentials and
+# protect nothing, so they are allowlisted by path rather than by disabling any
+# rule. A real credential committed anywhere else still fails the pipeline.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Session 12 sample Secret manifests (fake credentials used for teaching)"
+paths = [
+  '''^session-12-ingress-configmaps-secrets/''',
+  '''^11-kubernetes-ingress-configmaps-secrets/''',
+]
