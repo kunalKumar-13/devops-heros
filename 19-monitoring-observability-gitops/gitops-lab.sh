@@ -40,9 +40,11 @@ for i in $(seq 1 60); do
   sleep 5
 done
 run kubectl get applications -n argocd
+expect_sh "Argo CD reports the app Synced and Healthy" "[ \"\$(kubectl get application session20-mini -n argocd -o jsonpath='{.status.sync.status}/{.status.health.status}')\" = Synced/Healthy ]"
 
 banner "4. What Argo CD created in the cluster"
 run kubectl get all -n $NS
+expect "Argo CD created the deployment with 2 ready replicas, as Git says" wait_replicas 2
 
 banner "5. Make a Git change: scale from 2 to 3 replicas, in Git only"
 runsh "sed -i 's/replicas: 2/replicas: 3/' gitops/app/deployment.yaml && git diff gitops/app/deployment.yaml"
@@ -55,6 +57,8 @@ run kubectl get deployment session20-mini -n $NS
 runsh "kubectl get application session20-mini -n argocd -o jsonpath='synced to commit: {.status.sync.revision}{\"\\n\"}'"
 runsh "git rev-parse HEAD"
 note "the synced revision is the commit just pushed: Git -> Argo CD -> Kubernetes"
+expect "after the Git change the deployment has 3 ready replicas" wait_replicas 3
+expect_sh "Argo CD synced exactly the commit that was pushed" "[ \"\$(kubectl get application session20-mini -n argocd -o jsonpath='{.status.sync.revision}')\" = \"\$(git rev-parse HEAD)\" ]"
 
 banner "6. Self-healing: change the cluster by hand and watch Argo CD undo it"
 run kubectl scale deployment session20-mini -n $NS --replicas=1
@@ -63,12 +67,16 @@ note "Git still says 3, and selfHeal is on"
 wait_replicas 3
 run kubectl get deployment session20-mini -n $NS
 runsh "kubectl get events -n $NS --sort-by=.lastTimestamp | grep -i scaled | tail -4"
+expect "self-healing: a manual scale to 1 was reverted to 3" wait_replicas 3
 
 banner "7. Pruning: delete the Service by hand, Argo CD recreates it"
 run kubectl delete service session20-mini -n $NS
 sleep 20
 run kubectl get service session20-mini -n $NS
+expect "a Service deleted by hand was recreated by Argo CD" kubectl get service session20-mini -n $NS
 
 banner "8. Observe the system"
 run kubectl logs deployment/session20-mini -n $NS --tail=5
 runsh "kubectl get application session20-mini -n argocd -o jsonpath='{range .status.history[*]}{.id}  {.revision}  {.deployedAt}{\"\\n\"}{end}'"
+
+finish

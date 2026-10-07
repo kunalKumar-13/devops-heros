@@ -9,7 +9,9 @@ set -uo pipefail
 cd "$(dirname "$0")/s3-bucket"
 source ../../labs/lib.sh
 
-: "${AWS_ENDPOINT:=http://localhost:5000}"
+: "${AWS_ENDPOINT:=http://127.0.0.1:5000}"
+# fail fast and clearly if the emulator is not answering
+curl -s -o /dev/null --max-time 5 "$AWS_ENDPOINT" || { echo "no AWS API at $AWS_ENDPOINT" >&2; exit 1; }
 export AWS_ACCESS_KEY_ID=testing AWS_SECRET_ACCESS_KEY=testing AWS_DEFAULT_REGION=ap-south-1
 AWS="aws --endpoint-url $AWS_ENDPOINT"
 
@@ -52,6 +54,7 @@ runsh "terraform state show -no-color aws_s3_bucket.this | grep -E 'bucket |arn 
 banner "6. Outputs"
 run terraform output -no-color
 BUCKET=$(terraform output -raw bucket_name)
+expect "apply created the bucket ($BUCKET)" $AWS s3api head-bucket --bucket "$BUCKET"
 
 banner "7. Verify with the AWS CLI, independently of Terraform"
 runsh "$AWS s3api list-buckets --query 'Buckets[].Name' --output text"
@@ -59,15 +62,21 @@ runsh "$AWS s3api get-bucket-versioning --bucket $BUCKET"
 runsh "$AWS s3api get-bucket-encryption --bucket $BUCKET --query 'ServerSideEncryptionConfiguration.Rules[0]'"
 runsh "$AWS s3api get-public-access-block --bucket $BUCKET"
 runsh "echo 'hello from kunal' > note.txt && $AWS s3 cp note.txt s3://$BUCKET/note.txt && $AWS s3 ls s3://$BUCKET/"
+expect_sh "versioning is Enabled" "$AWS s3api get-bucket-versioning --bucket $BUCKET | grep -q Enabled"
+expect_sh "objects are encrypted at rest with AES256" "$AWS s3api get-bucket-encryption --bucket $BUCKET | grep -q AES256"
+expect_sh "all four public-access blocks are on" "[ \$($AWS s3api get-public-access-block --bucket $BUCKET | grep -c true) -eq 4 ]"
+expect_sh "an object can be written and read back" "$AWS s3 cp s3://$BUCKET/note.txt - | grep -q kunal"
 
 banner "8. Idempotence: planning again changes nothing"
 run terraform plan -input=false -no-color -detailed-exitcode
 note "exit code 0 from -detailed-exitcode means: no changes"
+expect "re-planning finds no changes (idempotent)" terraform plan -input=false -detailed-exitcode
 
 banner "9. A change: turn versioning off, see an in-place update"
 run terraform plan -input=false -no-color -var enable_versioning=false
 run terraform apply -input=false -no-color -auto-approve -var enable_versioning=false
 runsh "$AWS s3api get-bucket-versioning --bucket $BUCKET"
+expect_sh "the change was applied in place (versioning Suspended)" "$AWS s3api get-bucket-versioning --bucket $BUCKET | grep -q Suspended"
 
 banner "10. terraform destroy"
 runsh "$AWS s3 rm s3://$BUCKET --recursive"
@@ -75,4 +84,9 @@ run terraform destroy -input=false -no-color -auto-approve -var enable_versionin
 run terraform state list
 runsh "$AWS s3api list-buckets --query 'Buckets[].Name' --output text; echo '(no buckets left)'"
 
+
+expect "destroy removed the bucket" bash -c "! $AWS s3api head-bucket --bucket $BUCKET"
+expect "state is empty after destroy" bash -c "[ -z \"\$(terraform state list)\" ]"
+
 rm -f emulator_override.tf tfplan note.txt
+finish

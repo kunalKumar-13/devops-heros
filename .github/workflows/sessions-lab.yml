@@ -28,6 +28,18 @@ on:
       - ".github/workflows/sessions-lab.yml"
   workflow_dispatch:
 
+# Third-party actions are pinned to a full commit SHA (the tag is in the
+# comment): a tag can be moved to malicious code if an action's repository is
+# compromised, a commit SHA cannot. Every job starts with read-only access.
+permissions:
+  contents: read
+
+# Each lab ends with a list of verified checks and exits non-zero if any
+# failed. bash with pipefail makes sure `| tee` cannot hide that exit code.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   kubernetes:
     name: Kubernetes labs (sessions 9-15)
@@ -37,7 +49,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: helm/kind-action@v1
+      - uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
         with:
           cluster_name: devops
           config: logs/kind-cluster.yaml
@@ -60,9 +72,11 @@ jobs:
         run: bash 12-kubernetes-storage-hpa-probes/lab.sh 2>&1 | tee evidence/session13.txt
 
       - name: Session 14 - troubleshooting
+        if: success() || failure()
         run: bash 13-kubernetes-troubleshooting/lab.sh 2>&1 | tee evidence/session14.txt
 
       - name: Session 15 - Helm
+        if: success() || failure()
         run: bash 14-helm/lab.sh 2>&1 | tee evidence/session15.txt
 
       - uses: actions/upload-artifact@v7
@@ -76,24 +90,27 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PROMPT_HOST: terraform-lab
-      AWS_ENDPOINT: http://localhost:5000
+      AWS_ENDPOINT: http://127.0.0.1:5000
     steps:
       - uses: actions/checkout@v7
-      - uses: hashicorp/setup-terraform@v4
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
         with:
           terraform_version: "1.10.3"
           terraform_wrapper: false
       - name: Start Moto (AWS API emulator)
         run: |
           pip install -q "moto[server]==5.2.3"
-          nohup moto_server -p 5000 > moto.log 2>&1 &
-          for i in $(seq 1 20); do curl -s localhost:5000 >/dev/null && break; sleep 1; done
+          nohup moto_server -H 127.0.0.1 -p 5000 > moto.log 2>&1 &
+          for i in $(seq 1 30); do curl -s -o /dev/null "$AWS_ENDPOINT" && break; sleep 1; done
+          curl -sS -o /dev/null "$AWS_ENDPOINT" || { cat moto.log; exit 1; }
+          echo "Moto is answering on $AWS_ENDPOINT"
           aws --version
       - name: Session 18 - Terraform lifecycle on S3
         run: |
           mkdir -p evidence
           bash 17-terraform-iac/lab.sh 2>&1 | tee evidence/session18.txt
       - name: Session 19 - VPC on AWS with Terraform
+        if: success() || failure()
         run: bash 18-cloud-terraform/lab.sh 2>&1 | tee evidence/session19.txt
       - uses: actions/upload-artifact@v7
         if: always()
@@ -110,15 +127,18 @@ jobs:
       - uses: actions/checkout@v7
       - name: Prometheus + Grafana
         run: |
+          GRAFANA_ADMIN_PASSWORD=$(openssl rand -hex 16)
+          echo "::add-mask::$GRAFANA_ADMIN_PASSWORD"
+          echo "GRAFANA_ADMIN_PASSWORD=$GRAFANA_ADMIN_PASSWORD" >> "$GITHUB_ENV"
+          export GRAFANA_ADMIN_PASSWORD
           mkdir -p evidence
           bash 19-monitoring-observability-gitops/monitoring-lab.sh 2>&1 | tee evidence/session20-monitoring.txt
       - uses: actions/setup-node@v7
         with: { node-version: "22" }
       - name: Screenshots
         working-directory: labs
-        env:
-          SHOT_AUTH: admin:kunal-demo
         run: |
+          export SHOT_AUTH="admin:$GRAFANA_ADMIN_PASSWORD"
           npm init -y >/dev/null && npm install --no-save --no-audit --no-fund playwright@1.63.0
           npx playwright install --with-deps chromium
           node screenshot.mjs ../evidence \
@@ -144,7 +164,7 @@ jobs:
         run: |
           git push origin HEAD:refs/heads/$GITOPS_BRANCH
           echo "Argo CD will follow $GITOPS_BRANCH"
-      - uses: helm/kind-action@v1
+      - uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
         with: { cluster_name: gitops }
       - name: Argo CD sync, Git change, self-healing
         run: |

@@ -6,7 +6,8 @@ set -uo pipefail
 cd "$(dirname "$0")/vpc"
 source ../../labs/lib.sh
 
-: "${AWS_ENDPOINT:=http://localhost:5000}"
+: "${AWS_ENDPOINT:=http://127.0.0.1:5000}"
+curl -s -o /dev/null --max-time 5 "$AWS_ENDPOINT" || { echo "no AWS API at $AWS_ENDPOINT" >&2; exit 1; }
 export AWS_ACCESS_KEY_ID=testing AWS_SECRET_ACCESS_KEY=testing AWS_DEFAULT_REGION=ap-south-1
 AWS="aws --endpoint-url $AWS_ENDPOINT"
 
@@ -38,6 +39,11 @@ run terraform output -no-color
 VPC=$(terraform output -raw vpc_id)
 SUBNET=$(terraform output -raw public_subnet_id)
 SG=$(terraform output -raw web_security_group_id)
+expect_sh "the VPC exists with CIDR 10.20.0.0/16" "$AWS ec2 describe-vpcs --vpc-ids $VPC | grep -q 10.20.0.0/16"
+expect_sh "the public subnet is 10.20.1.0/24 and assigns public IPs" "$AWS ec2 describe-subnets --subnet-ids $SUBNET --query 'Subnets[0].[CidrBlock,MapPublicIpOnLaunch]' --output text | grep -qP '10.20.1.0/24\\s+True'"
+expect_sh "an internet gateway is attached to the VPC" "$AWS ec2 describe-internet-gateways --filters Name=attachment.vpc-id,Values=$VPC --query 'length(InternetGateways)' | grep -q 1"
+expect_sh "the subnet routes 0.0.0.0/0 to the internet gateway" "$AWS ec2 describe-route-tables --filters Name=association.subnet-id,Values=$SUBNET --query 'RouteTables[0].Routes[?DestinationCidrBlock==\`0.0.0.0/0\`].GatewayId' --output text | grep -q ^igw-"
+expect_sh "the security group opens 80, 443 and 22" "[ \"\$($AWS ec2 describe-security-groups --group-ids $SG --query 'SecurityGroups[0].IpPermissions[].FromPort' --output text | tr -s '\\t ' '\\n' | sort -n | tr '\\n' ' ')\" = '22 80 443 ' ]"
 
 banner "4. Verify each piece with the AWS CLI"
 runsh "$AWS ec2 describe-vpcs --vpc-ids $VPC --query 'Vpcs[0].{Id:VpcId,Cidr:CidrBlock,State:State}' --output table"
@@ -54,5 +60,7 @@ banner "6. destroy"
 run terraform destroy -input=false -no-color -auto-approve
 runsh "$AWS ec2 describe-vpcs --filters Name=tag:Project,Values=kunal-web --query 'length(Vpcs)'"
 note "0 VPCs tagged Project=kunal-web remain"
+expect_sh "destroy removed the VPC" "[ \$($AWS ec2 describe-vpcs --filters Name=tag:Project,Values=kunal-web --query 'length(Vpcs)') -eq 0 ]"
 
 rm -f emulator_override.tf tfplan
+finish
