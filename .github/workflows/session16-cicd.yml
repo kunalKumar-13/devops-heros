@@ -24,6 +24,12 @@ defaults:
   run:
     working-directory: 15-github-actions
 
+# Third-party actions are pinned to a full commit SHA (the tag is in the
+# comment): a tag can be moved to malicious code if an action's repository is
+# compromised, a commit SHA cannot. Every job starts with read-only access.
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Test (${{ matrix.os }}, Python ${{ matrix.python }})
@@ -58,7 +64,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Build the package
-        run: ./build.sh
+        run: bash build.sh
       - name: Upload the build
         uses: actions/upload-artifact@v7
         with:
