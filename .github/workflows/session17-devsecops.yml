@@ -168,8 +168,12 @@ jobs:
           kubectl get pods -l app=secure-api -o wide
       - name: Smoke test, and confirm the hardening took effect
         run: |
-          kubectl run smoke --rm -i --restart=Never --image=curlimages/curl:8.10.1 -- \
-            sh -c 'curl -s http://secure-api/health; echo; curl -s "http://secure-api/add?a=2&b=3"; echo'
+          # read the result from the pod's logs: attaching with -i can miss output from a pod this short
+          kubectl run smoke --restart=Never --image=curlimages/curl:8.10.1 -- \
+            sh -c 'curl -sf http://secure-api/health && echo && curl -sf "http://secure-api/add?a=2&b=3" && echo'
+          kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/smoke --timeout=60s
+          kubectl logs smoke
+          kubectl logs smoke | grep -q '"result":5.0'
           pod=$(kubectl get pod -l app=secure-api -o jsonpath='{.items[0].metadata.name}')
           echo "user inside the container: $(kubectl exec $pod -- id)"
           kubectl exec $pod -- sh -c 'touch /app/x 2>&1 || echo "root filesystem is read-only, as configured"'
