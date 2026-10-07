@@ -279,7 +279,10 @@ section11() {
   runsh "POD=\$(kubectl get pod -l app=api -o jsonpath='{.items[0].metadata.name}'); kubectl exec \$POD -- sh -c 'echo APP_ENV=\$APP_ENV; echo LOG_LEVEL=\$LOG_LEVEL; echo DB_PASSWORD=\$DB_PASSWORD'"
 
   banner "11.7  a 404 and a 503, on purpose - what each one means"
-  runsh "curl -s -m 10 -o /dev/null -w 'no matching rule -> HTTP %{http_code}\n' http://kunal-devops.local/nope/"
+  # the path-based rule has a / Prefix catch-all, so no *path* on that host can miss;
+  # a host that no rule names is what reaches the controller's 404
+  runsh "curl -s -m 10 -o /dev/null -w 'path /nope/ on a host with a / rule -> HTTP %{http_code} (the catch-all answered)\n' http://kunal-devops.local/nope/"
+  runsh "curl -s -m 10 -o /dev/null -w 'host no rule mentions -> HTTP %{http_code}\n' -H 'Host: unknown.kunal-devops.local' http://kunal-devops.local/"
   runsh "kubectl scale deploy/shop --replicas=0; sleep 12; curl -s -m 10 -o /dev/null -w 'rule matched, no endpoints -> HTTP %{http_code}\n' http://kunal-devops.local/shop/"
   runsh "kubectl scale deploy/shop --replicas=1; kubectl rollout status deploy/shop --timeout=180s"
 
