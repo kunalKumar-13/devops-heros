@@ -12,7 +12,7 @@ two_ready()        { [ "$(kubectl get deploy web-app -n $NS -o jsonpath='{.statu
 emptydir_shared()  { kubectl exec -n $NS emptydir-demo -c reader -- cat /shared/msg | grep -q written-by-writer; }
 data_survived()    { kubectl exec -n $NS "$NEW" -- cat /data/student.txt | grep -q 'Kunal Kumar'; }
 has_endpoints()    { [ -n "$(kubectl get endpoints web-app -n $NS -o jsonpath='{.subsets[0].addresses[0].ip}')" ]; }
-service_answers()  { kubectl run svc-check -n $NS --rm -i --restart=Never --image=curlimages/curl:8.10.1 -- curl -sf http://web-app/ >/dev/null; }
+service_answers()  { kubectl run svc-check -n $NS --rm -i -q --restart=Never --image=curlimages/curl:8.10.1 -- curl -sf http://web-app/ >/dev/null; }
 hpa_has_metrics()  { kubectl get hpa web-app-hpa -n $NS -o jsonpath='{.status.currentMetrics[0].resource.current.averageUtilization}' | grep -qE '^[0-9]+$'; }
 probes_defined()   { kubectl get deploy web-app -n $NS -o jsonpath='{.spec.template.spec.containers[0].startupProbe.httpGet.path}{.spec.template.spec.containers[0].readinessProbe.httpGet.path}{.spec.template.spec.containers[0].livenessProbe.httpGet.path}' | grep -q '^///$'; }
 
@@ -60,7 +60,7 @@ expect "a new pod replaced the deleted one" test "$POD" != "$NEW"
 expect "the data written before the pod was deleted is still there" data_survived
 
 banner "7. Task 2: the Service answers"
-runsh "kubectl run curl-svc -n $NS --rm -i --restart=Never --image=curlimages/curl:8.10.1 -- curl -s http://web-app.$NS.svc.cluster.local/"
+runsh "kubectl run curl-svc -n $NS --rm -i -q --restart=Never --image=curlimages/curl:8.10.1 -- curl -s http://web-app.$NS.svc.cluster.local/"
 run kubectl get endpoints web-app -n $NS
 expect "the Service has endpoints" has_endpoints
 expect "the Service answers HTTP requests" service_answers

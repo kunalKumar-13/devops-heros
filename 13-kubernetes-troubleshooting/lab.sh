@@ -5,18 +5,18 @@ set -uo pipefail
 cd "$(dirname "$0")"
 source ../labs/lib.sh
 
-curl_svc()      { kubectl run "c$RANDOM" --rm -i --restart=Never --image=curlimages/curl:8.10.1 -- curl -sf -m 5 http://troubleshooting-service/ >/dev/null; }
+curl_svc()      { kubectl run "c$RANDOM" --rm -i -q --restart=Never --image=curlimages/curl:8.10.1 -- curl -sf -m 5 http://troubleshooting-service/ >/dev/null; }
 endpoints_ip()  { kubectl get endpoints troubleshooting-service -o jsonpath='{.subsets[0].addresses[0].ip}'; }
 has_endpoints() { [ -n "$(endpoints_ip)" ]; }
 no_endpoints()  { [ -z "$(endpoints_ip)" ]; }
 waiting_reason(){ kubectl get pod "$1" -o jsonpath='{.status.containerStatuses[0].state.waiting.reason}'; }
 image_pull_err(){ waiting_reason project-broken-pod | grep -qE 'ErrImagePull|ImagePullBackOff'; }
 crashlooping()  { [ "$(kubectl get pod crashloop -o jsonpath='{.status.containerStatuses[0].restartCount}')" -ge 1 ]; }
-crash_logged()  { kubectl logs crashloop --previous 2>/dev/null | grep -q FATAL || kubectl logs crashloop | grep -q FATAL; }
+crash_logged()  { kubectl logs crashloop | grep -q FATAL; }
 unschedulable() { kubectl get pod pending -o jsonpath='{.status.conditions[?(@.type=="PodScheduled")].reason}' | grep -q Unschedulable; }
 oom_killed()    { kubectl get pod oomkilled -o jsonpath='{.status.containerStatuses[0].state.terminated.reason}' | grep -q OOMKilled; }
 # busybox nslookup exits 1 when the IPv6 (AAAA) lookup is empty, so judge by the answer, not the exit code
-dns_resolves()  { [ "$(kubectl run "d$RANDOM" --rm -i --restart=Never --image=busybox:1.36 -- nslookup troubleshooting-service.default.svc.cluster.local 2>/dev/null | grep -A1 '^Name:' | grep -oE 'Address: [0-9.]+' | head -1 | cut -d' ' -f2)" = "$(kubectl get svc troubleshooting-service -o jsonpath='{.spec.clusterIP}')" ]; }
+dns_resolves()  { [ "$(kubectl run "d$RANDOM" --rm -i -q --restart=Never --image=busybox:1.36 -- nslookup troubleshooting-service.default.svc.cluster.local 2>/dev/null | grep -A1 '^Name:' | grep -oE 'Address: [0-9.]+' | head -1 | cut -d' ' -f2)" = "$(kubectl get svc troubleshooting-service -o jsonpath='{.spec.clusterIP}')" ]; }
 
 banner "1. Deploy the application"
 run kubectl apply -f manifests/01-app.yaml
@@ -30,7 +30,7 @@ run kubectl logs "$POD" --tail=5
 runsh "kubectl exec $POD -- curl -s localhost | grep -i '<title>'"
 expect "inside the pod, nginx answers on localhost" bash -c "kubectl exec $POD -- curl -sf localhost | grep -qi nginx"
 note "now the same request through the Service"
-runsh "kubectl run curl-ok --rm -i --restart=Never --image=curlimages/curl:8.10.1 -- curl -s -o /dev/null -w 'HTTP %{http_code}\n' http://troubleshooting-service"
+runsh "kubectl run curl-ok --rm -i -q --restart=Never --image=curlimages/curl:8.10.1 -- curl -s -o /dev/null -w 'HTTP %{http_code}\n' http://troubleshooting-service"
 expect "baseline: the Service answers" curl_svc
 
 banner "3. Check the Service and its endpoints"
@@ -60,7 +60,7 @@ run kubectl apply -f manifests/03-broken-service.yaml
 sleep 3
 run kubectl get service troubleshooting-service
 run kubectl get endpoints troubleshooting-service
-runsh "kubectl run curl-broken --rm -i --restart=Never --image=curlimages/curl:8.10.1 -- curl -s -m 5 -o /dev/null -w 'HTTP %{http_code}\n' http://troubleshooting-service || echo 'request failed: nothing behind the Service'"
+runsh "kubectl run curl-broken --rm -i -q --restart=Never --image=curlimages/curl:8.10.1 -- curl -s -m 5 -o /dev/null -w 'HTTP %{http_code}\n' http://troubleshooting-service || echo 'request failed: nothing behind the Service'"
 expect "broken selector: the Service has no endpoints" no_endpoints
 note "root cause: compare the pod labels with the Service selector"
 run kubectl get pods --show-labels -l app=troubleshooting-app
@@ -69,19 +69,19 @@ note "fix: put the selector back to app=troubleshooting-app"
 run kubectl apply -f manifests/01-app.yaml
 sleep 3
 run kubectl get endpoints troubleshooting-service
-runsh "kubectl run curl-fixed --rm -i --restart=Never --image=curlimages/curl:8.10.1 -- curl -s -o /dev/null -w 'HTTP %{http_code}\n' http://troubleshooting-service"
+runsh "kubectl run curl-fixed --rm -i -q --restart=Never --image=curlimages/curl:8.10.1 -- curl -s -o /dev/null -w 'HTTP %{http_code}\n' http://troubleshooting-service"
 expect "selector fixed: endpoints are back" has_endpoints
 expect "selector fixed: the Service answers again" curl_svc
 
 banner "6. DNS: the Service name resolves inside the cluster"
-runsh "kubectl run dns-test --rm -i --restart=Never --image=busybox:1.36 -- nslookup troubleshooting-service.default.svc.cluster.local"
+runsh "kubectl run dns-test --rm -i -q --restart=Never --image=busybox:1.36 -- nslookup troubleshooting-service.default.svc.cluster.local"
 expect "the Service DNS name resolves to the Service ClusterIP" dns_resolves
 
 banner "7. CrashLoopBackOff"
 run kubectl apply -f manifests/04-crashloop.yaml
 sleep 45
 run kubectl get pod crashloop
-runsh "kubectl logs crashloop --previous || kubectl logs crashloop"
+run kubectl logs crashloop
 runsh "kubectl describe pod crashloop | grep -E 'State|Reason|Exit Code|Restart Count|Back-off' | head -10"
 expect "crash loop: the container has been restarted" crashlooping
 expect "crash loop: the logs show why (FATAL config error)" crash_logged

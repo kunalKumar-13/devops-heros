@@ -6,7 +6,7 @@ cd "$(dirname "$0")"
 source ../labs/lib.sh
 
 page() {  # print the rendered page's status line from inside the cluster
-  kubectl run "page-$1" --rm -i --restart=Never --image=curlimages/curl:8.10.1 -- \
+  kubectl run "page-$1" --rm -i -q --restart=Never --image=curlimages/curl:8.10.1 -- \
     curl -s http://notes-dev-svc 2>/dev/null | tr '\n' ' ' | grep -o 'environment:.*image: <b>[^<]*' \
     | sed -e 's/<[^>]*>//g' -e 's/&middot;/|/g' -e 's/  */ /g'
 }
