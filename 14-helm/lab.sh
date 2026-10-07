@@ -6,9 +6,12 @@ cd "$(dirname "$0")"
 source ../labs/lib.sh
 
 page() {  # print the rendered page's status line from inside the cluster
-  kubectl run "page-$1" --rm -i -q --restart=Never --image=curlimages/curl:8.10.1 -- \
-    curl -s http://notes-dev-svc 2>/dev/null | tr '\n' ' ' | grep -o 'environment:.*image: <b>[^<]*' \
-    | sed -e 's/<[^>]*>//g' -e 's/&middot;/|/g' -e 's/  */ /g'
+  # run, wait, read the logs: attaching with -i sometimes prints the output twice
+  kubectl run "page-$1" --restart=Never --image=curlimages/curl:8.10.1 -- curl -s http://notes-dev-svc >/dev/null 2>&1
+  kubectl wait --for=jsonpath='{.status.phase}'=Succeeded "pod/page-$1" --timeout=60s >/dev/null 2>&1
+  kubectl logs "page-$1" 2>/dev/null | tr '\n' ' ' | grep -o 'environment:[^<]*<b>[^<]*</b>[^<]*<b>[^<]*</b>[^<]*<b>[^<]*</b>[^<]*<b>[^<]*' \
+    | head -1 | sed -e 's/<[^>]*>//g' -e 's/&middot;/|/g' -e 's/  */ /g'
+  kubectl delete pod "page-$1" --wait=false >/dev/null 2>&1
 }
 
 rev_status() { helm history notes-dev -o json | python3 -c "import json,sys; h={r['revision']:r['status'] for r in json.load(sys.stdin)}; sys.exit(0 if h.get($1)=='$2' else 1)"; }
