@@ -1,0 +1,19 @@
+# Development defaults. values-prod.yaml overrides what differs.
+replicaCount: 1
+
+image:
+  repository: nginx
+  tag: "1.26-alpine"
+
+service:
+  port: 80
+  nodePort: 30090
+
+app:
+  name: notes-app
+  environment: development
+  # Rendered into the page nginx serves, so a values change is visible in the app.
+  notes:
+    - Helm turns a directory of templates into a versioned release
+    - values.yaml is the default; -f values-prod.yaml overrides it
+    - helm rollback restores any earlier revision

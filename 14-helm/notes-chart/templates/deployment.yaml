@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-deploy
+  labels:
+    {{- include "notes.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+      annotations:
+        # a changed ConfigMap changes this hash, which rolls the pods so they
+        # pick up the new content
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      containers:
+        - name: notes
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          ports:
+            - containerPort: {{ .Values.service.port }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Release.Name }}-config
+          readinessProbe:
+            httpGet: { path: /, port: {{ .Values.service.port }} }
+            periodSeconds: 5
+          volumeMounts:
+            - name: page
+              mountPath: /usr/share/nginx/html
+      volumes:
+        - name: page
+          configMap:
+            name: {{ .Release.Name }}-config
+            items:
+              - key: index.html
+                path: index.html
