@@ -1,0 +1,29 @@
+# Monitoring stack for Session 20: Prometheus scrapes itself, a node exporter
+# (host metrics) and a sample app; Grafana reads from Prometheus with the
+# datasource and a dashboard provisioned from files, so nothing is clicked.
+services:
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    ports: ["9090:9090"]
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+  node-exporter:
+    image: prom/node-exporter:v1.9.1
+    ports: ["9100:9100"]
+
+  # A small Go app that exposes its own request metrics on /metrics
+  sample-app:
+    image: quay.io/brancz/prometheus-example-app:v0.5.0
+    ports: ["8080:8080"]
+
+  grafana:
+    image: grafana/grafana:12.1.1
+    ports: ["3000:3000"]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: kunal-demo        # local demo only
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on: [prometheus]
