@@ -1,0 +1,45 @@
+# Two replicas, all three probe types, resource requests (the HPA needs them)
+# and the PVC mounted at /data.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+  namespace: production-webapp
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: web-app }
+  template:
+    metadata:
+      labels: { app: web-app }
+    spec:
+      containers:
+        - name: web
+          image: registry.k8s.io/hpa-example
+          ports:
+            - containerPort: 80
+          resources:
+            requests: { cpu: 100m, memory: 64Mi }
+            limits:   { cpu: 300m, memory: 128Mi }
+          # startup: gives the container up to 60s before the others begin
+          startupProbe:
+            httpGet: { path: /, port: 80 }
+            periodSeconds: 5
+            failureThreshold: 12
+          # readiness: failing pulls the pod out of the Service, no restart
+          readinessProbe:
+            httpGet: { path: /, port: 80 }
+            periodSeconds: 5
+            failureThreshold: 3
+          # liveness: failing restarts the container
+          livenessProbe:
+            httpGet: { path: /, port: 80 }
+            periodSeconds: 10
+            failureThreshold: 3
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: web-data

@@ -1,0 +1,13 @@
+# 500Mi of storage that outlives any one pod. ReadWriteOnce means one node may
+# mount it read-write, so both replicas must land on the same node, which is
+# always true on a single-node lab cluster.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: web-data
+  namespace: production-webapp
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 500Mi
